@@ -1,0 +1,9 @@
+[phases.setup]
+nixpkgsArchive = "0d1ef1a839ce0f3282bf24bea2788b9ad659be83"
+nixPkgs = ["bun"]
+
+[phases.build]
+cmds = ["bun install", "bun install:frontend", "cd frontend && bun run build"]
+
+[start]
+cmd = "bun run start"

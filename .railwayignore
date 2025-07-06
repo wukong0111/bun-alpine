@@ -1,0 +1,38 @@
+# Development files
+node_modules
+.git
+.gitignore
+
+# Development tools
+.vscode
+.idea
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Documentation (not needed for runtime)
+README.md
+docs/
+
+# Test files
+*.test.ts
+*.test.js
+__tests__/
+
+# Development dependencies
+frontend/node_modules
+
+# Source maps (optional - remove if you want them in production)
+*.map
+
+# Environment files (use Railway's env vars instead)
+.env
+.env.local
+.env.production

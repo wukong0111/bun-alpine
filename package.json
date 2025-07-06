@@ -8,6 +8,7 @@
     "build": "bun install:frontend && cd frontend && bun run build",
     "start": "NODE_ENV=production bun index.ts",
     "start:dev": "NODE_ENV=development bun index.ts",
+    "start:railway": "NODE_ENV=production bun index.ts",
     "install:frontend": "cd frontend && bun install",
     "lint": "biome lint .",
     "format": "biome format --write .",

@@ -145,7 +145,41 @@ bun run start    # Start production server (with production security)
 - **Development**: Permissive CSP with `'unsafe-eval'` for Alpine.js, 1000 req/15min rate limit
 - **Production**: Strict CSP without `'unsafe-eval'`, 100 req/15min rate limit
 
-### Environment Variables
+### Railway Deployment
+
+This project is ready for Railway deployment with zero configuration:
+
+#### Quick Deploy
+1. **Connect GitHub repository** to Railway
+2. **Deploy automatically** - Railway will detect Bun and build using `nixpacks.toml`
+3. **Environment variables** - Set `NODE_ENV=production` in Railway dashboard
+
+#### Manual Deploy Steps
+```bash
+# 1. Install Railway CLI
+npm install -g @railway/cli
+
+# 2. Login to Railway
+railway login
+
+# 3. Initialize project
+railway init
+
+# 4. Deploy
+railway up
+```
+
+#### Railway Configuration
+- **Port**: Automatically configured via `process.env.PORT`
+- **Build**: Uses `nixpacks.toml` with latest Bun version
+- **Environment**: Set `NODE_ENV=production` for production security
+- **Ignore files**: `.railwayignore` optimizes deployment size
+
+#### Environment Variables
+- `NODE_ENV=production` (for production security settings)
+- `PORT` (automatically set by Railway)
+
+### Local Environment Variables
 The server runs on port `3000` by default. Configure via environment or modify `index.ts`.
 
 ## 📚 Learn More
