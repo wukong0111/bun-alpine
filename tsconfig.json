@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    // Backend/Bun environment
+    "lib": ["ESNext"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    "allowJs": true,
+
+    // Bun bundler mode
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+
+    // Bun types
+    "types": ["bun-types"],
+
+    // Strict type checking for backend
+    "strict": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+
+    // Backend-specific flags
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noPropertyAccessFromIndexSignature": false
+  },
+  "include": ["index.ts", "src/**/*", "esbuild.config.ts"],
+  "exclude": ["frontend/**/*"]
+}

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bun + Alpine.js App</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div id="app" x-data="appData">
+        <header>
+            <h1>Bun + Alpine.js + Elysia.js</h1>
+            <p>Full-stack TypeScript application</p>
+        </header>
+
+        <main>
+            <section>
+                <h2>API Health Check</h2>
+                <button 
+                    x-on:click="checkHealth"
+                    x-text="healthLoading ? 'Checking...' : 'Check Health'"
+                    :disabled="healthLoading"
+                    class="btn">
+                </button>
+                <div x-show="healthResult" x-text="healthResult" class="result"></div>
+            </section>
+
+            <section>
+                <h2>Users</h2>
+                <button 
+                    x-on:click="loadUsers"
+                    x-text="usersLoading ? 'Loading...' : 'Load Users'"
+                    :disabled="usersLoading"
+                    class="btn">
+                </button>
+                <div x-show="users.length > 0" class="users-list">
+                    <template x-for="user in users" :key="user.id">
+                        <div class="user-item">
+                            <span x-text="user.name"></span>
+                            <small x-text="'ID: ' + user.id"></small>
+                        </div>
+                    </template>
+                </div>
+            </section>
+
+            <section>
+                <h2>Add User</h2>
+                <form x-on:submit.prevent="addUser">
+                    <input 
+                        type="text" 
+                        x-model="newUser.name" 
+                        placeholder="User name"
+                        required>
+                    <button 
+                        type="submit"
+                        x-text="addUserLoading ? 'Adding...' : 'Add User'"
+                        :disabled="addUserLoading"
+                        class="btn">
+                    </button>
+                </form>
+                <div x-show="addUserResult" x-text="addUserResult" class="result"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/main.js"></script>
+</body>
+</html>
