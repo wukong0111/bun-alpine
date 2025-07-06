@@ -3,128 +3,226 @@ import ajax from '@imacrayon/alpine-ajax';
 
 Alpine.plugin(ajax);
 
-interface User {
+// Interfaces para el sistema de ranking
+interface Language {
   id: number;
   name: string;
+  description: string;
+  color: string;
+  is_featured: boolean;
+  total_votes: number;
+  current_month_points?: number;
+  current_month_voters?: number;
 }
 
-interface HealthResponse {
-  status: string;
-  timestamp: string;
+interface RankingStats {
+  total_votes: number;
+  total_users: number;
+  total_points: number | null;
 }
 
-interface UsersResponse {
-  users: User[];
+interface RankingResponse {
+  month: string;
+  ranking: Language[];
+  stats: RankingStats;
 }
 
-interface AddUserResponse {
+interface LanguagesResponse {
+  featured: Language[];
+  additional: Language[];
+}
+
+interface VoteResponse {
   success: boolean;
-  user?: User;
+  message: string;
+  remaining_points: number;
 }
 
-interface AppData {
-  healthLoading: boolean;
-  healthResult: string;
-  usersLoading: boolean;
-  users: User[];
-  addUserLoading: boolean;
-  addUserResult: string;
-  newUser: { name: string };
-  checkHealth(): Promise<void>;
-  loadUsers(): Promise<void>;
-  addUser(): Promise<void>;
+interface RankingApp {
+  // Estado de carga
+  loading: boolean;
+  
+  // Datos principales
+  featuredLanguages: Language[];
+  additionalLanguages: Language[];
+  stats: RankingStats | null;
+  currentMonth: string;
+  
+  // Sistema de votación
+  votePoints: Record<number, number>;
+  pointsUsed: number;
+  votingInProgress: boolean;
+  
+  // Métodos principales
+  init(): Promise<void>;
+  loadRanking(): Promise<void>;
+  loadLanguages(): Promise<void>;
+  
+  // Sistema de votación
+  getMaxPointsForRank(rank: number): number;
+  canVote(languageId: number, points: number): boolean;
+  getVoteButtonText(languageId: number, points: number): string;
+  voteForLanguage(languageId: number, points: number): Promise<void>;
+  updatePointsUsed(): void;
+  
+  // Lenguajes adicionales
+  selectAdditionalLanguage(language: Language): void;
 }
 
 declare global {
   interface Window {
-    appData: AppData;
+    rankingApp: RankingApp;
   }
 }
 
-const appData: AppData = {
-  healthLoading: false,
-  healthResult: "",
-  usersLoading: false,
-  users: [],
-  addUserLoading: false,
-  addUserResult: "",
-  newUser: { name: "" },
+const rankingApp: RankingApp = {
+  // Estado inicial
+  loading: true,
+  featuredLanguages: [],
+  additionalLanguages: [],
+  stats: null,
+  currentMonth: '',
+  votePoints: {},
+  pointsUsed: 0,
+  votingInProgress: false,
 
-  async checkHealth() {
-    this.healthLoading = true;
-    this.healthResult = "";
-    
+  // Inicialización
+  async init() {
+    this.loading = true;
+    await Promise.all([
+      this.loadRanking(),
+      this.loadLanguages()
+    ]);
+    this.loading = false;
+  },
+
+  // Cargar ranking actual
+  async loadRanking() {
     try {
-      const response = await fetch("/app/health");
+      const response = await fetch('/app/ranking');
+      if (!response.ok) throw new Error('Failed to load ranking');
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json() as HealthResponse;
-      this.healthResult = `Status: ${data.status} - ${data.timestamp}`;
+      const data: RankingResponse = await response.json();
+      this.featuredLanguages = data.ranking;
+      this.stats = data.stats;
+      this.currentMonth = data.month;
     } catch (error) {
-      this.healthResult = `Error: ${error instanceof Error ? error.message : "Unknown error"}`;
-    } finally {
-      this.healthLoading = false;
+      console.error('Error loading ranking:', error);
     }
   },
 
-  async loadUsers() {
-    this.usersLoading = true;
-    
+  // Cargar todos los lenguajes
+  async loadLanguages() {
     try {
-      const response = await fetch("/app/users");
+      const response = await fetch('/app/languages');
+      if (!response.ok) throw new Error('Failed to load languages');
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json() as UsersResponse;
-      this.users = data.users;
+      const data: LanguagesResponse = await response.json();
+      // Los featured ya los tenemos del ranking, usar los additional
+      this.additionalLanguages = data.additional;
     } catch (error) {
-      console.error("Error loading users:", error);
-    } finally {
-      this.usersLoading = false;
+      console.error('Error loading languages:', error);
     }
   },
 
-  async addUser() {
-    if (!this.newUser.name.trim()) return;
+  // Obtener máximo de puntos según posición en ranking
+  getMaxPointsForRank(rank: number): number {
+    if (rank === 1) return 5;
+    if (rank === 2) return 3;
+    if (rank === 3) return 2;
+    if (rank <= 10) return 1;
+    return 1; // Para el resto también máximo 1 punto
+  },
+
+  // Verificar si puede votar
+  canVote(languageId: number, points: number): boolean {
+    if (!points || points <= 0) return false;
+    if (this.votingInProgress) return false;
     
-    this.addUserLoading = true;
-    this.addUserResult = "";
+    // Verificar que no exceda el total de puntos
+    const currentPoints = this.votePoints[languageId] || 0;
+    const newTotal = this.pointsUsed - currentPoints + points;
+    
+    return newTotal <= 10;
+  },
+
+  // Texto del botón de voto
+  getVoteButtonText(languageId: number, points: number): string {
+    if (this.votingInProgress) return 'Voting...';
+    if (!points || points <= 0) return 'Enter points';
+    if (!this.canVote(languageId, points)) return 'Not enough points';
+    return `Vote ${points} point${points > 1 ? 's' : ''}`;
+  },
+
+  // Votar por un lenguaje
+  async voteForLanguage(languageId: number, points: number) {
+    if (!this.canVote(languageId, points)) return;
+    
+    this.votingInProgress = true;
     
     try {
-      const response = await fetch("/app/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(this.newUser),
+      // Por ahora simulamos la votación (hasta implementar GitHub OAuth)
+      const response = await fetch('/app/test/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: 1, // Mock user ID
+          languageId,
+          points
+        })
       });
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      if (!response.ok) throw new Error('Vote failed');
       
-      const data = await response.json() as AddUserResponse;
+      const result: VoteResponse = await response.json();
       
-      if (data.success) {
-        this.addUserResult = `User "${this.newUser.name}" added successfully!`;
-        this.newUser.name = "";
-        this.loadUsers();
-      } else {
-        this.addUserResult = "Error adding user";
+      if (result.success) {
+        // Actualizar puntos localmente
+        this.votePoints[languageId] = points;
+        this.updatePointsUsed();
+        
+        // Mostrar mensaje de éxito (temporal)
+        alert(`Successfully voted ${points} points! ${result.remaining_points} points remaining.`);
       }
     } catch (error) {
-      this.addUserResult = `Error: ${error instanceof Error ? error.message : "Unknown error"}`;
+      console.error('Error voting:', error);
+      alert('Error submitting vote. Please try again.');
     } finally {
-      this.addUserLoading = false;
+      this.votingInProgress = false;
     }
   },
+
+  // Actualizar puntos usados
+  updatePointsUsed() {
+    this.pointsUsed = Object.values(this.votePoints).reduce((sum, points) => sum + (points || 0), 0);
+  },
+
+  // Seleccionar lenguaje adicional
+  selectAdditionalLanguage(language: Language) {
+    // Por ahora solo mostrar alerta, luego implementar modal o funcionalidad
+    alert(`Selected ${language.name}! Feature coming soon with GitHub OAuth.`);
+  }
 };
 
-window.appData = appData;
+// Configurar reactividad para votePoints
+const originalVotePoints = rankingApp.votePoints;
+rankingApp.votePoints = new Proxy(originalVotePoints, {
+  set(target, property, value) {
+    target[property as number] = value;
+    rankingApp.updatePointsUsed();
+    return true;
+  }
+});
+
+// Registrar la app globalmente
+window.rankingApp = rankingApp;
+
+// Inicializar Alpine.js con auto-init
+Alpine.data('rankingApp', () => rankingApp);
 
 Alpine.start();
+
+// Inicializar la aplicación cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', () => {
+  rankingApp.init();
+});

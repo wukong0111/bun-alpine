@@ -3,63 +3,173 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bun + Alpine.js App</title>
+    <title>Programming Languages Ranking 2025</title>
+    <meta name="description" content="Vote for your favorite programming languages - Community-driven monthly ranking">
     <link rel="stylesheet" href="/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div id="app" x-data="appData">
-        <header>
-            <h1>Bun + Alpine.js + Elysia.js</h1>
-            <p>Full-stack TypeScript application</p>
+    <div id="app" x-data="rankingApp">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <h1 class="title">
+                    <span class="emoji">🏆</span>
+                    Programming Languages Ranking
+                    <span class="year">2025</span>
+                </h1>
+                <p class="subtitle">Community-driven monthly ranking • Vote with 10 points per month</p>
+                
+                <!-- Stats Bar -->
+                <div class="stats-bar" x-show="stats">
+                    <div class="stat">
+                        <span class="stat-value" x-text="stats.total_votes || 0"></span>
+                        <span class="stat-label">Total Votes</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" x-text="stats.total_users || 0"></span>
+                        <span class="stat-label">Voters</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" x-text="currentMonth"></span>
+                        <span class="stat-label">Current Month</span>
+                    </div>
+                </div>
+            </div>
         </header>
 
-        <main>
-            <section>
-                <h2>API Health Check</h2>
-                <button 
-                    x-on:click="checkHealth"
-                    x-text="healthLoading ? 'Checking...' : 'Check Health'"
-                    :disabled="healthLoading"
-                    class="btn">
-                </button>
-                <div x-show="healthResult" x-text="healthResult" class="result"></div>
-            </section>
-
-            <section>
-                <h2>Users</h2>
-                <button 
-                    x-on:click="loadUsers"
-                    x-text="usersLoading ? 'Loading...' : 'Load Users'"
-                    :disabled="usersLoading"
-                    class="btn">
-                </button>
-                <div x-show="users.length > 0" class="users-list">
-                    <template x-for="user in users" :key="user.id">
-                        <div class="user-item">
-                            <span x-text="user.name"></span>
-                            <small x-text="'ID: ' + user.id"></small>
-                        </div>
-                    </template>
+        <main class="main">
+            <div class="container">
+                <!-- Loading State -->
+                <div x-show="loading" class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading ranking...</p>
                 </div>
-            </section>
 
-            <section>
-                <h2>Add User</h2>
-                <form x-on:submit.prevent="addUser">
-                    <input 
-                        type="text" 
-                        x-model="newUser.name" 
-                        placeholder="User name"
-                        required>
-                    <button 
-                        type="submit"
-                        x-text="addUserLoading ? 'Adding...' : 'Add User'"
-                        :disabled="addUserLoading"
-                        class="btn">
-                    </button>
-                </form>
-                <div x-show="addUserResult" x-text="addUserResult" class="result"></div>
-            </section>
+                <!-- Top 20 Ranking -->
+                <section class="ranking-section" x-show="!loading">
+                    <h2 class="section-title">
+                        <span class="emoji">🥇</span>
+                        Top 20 Programming Languages
+                    </h2>
+                    
+                    <div class="ranking-grid">
+                        <template x-for="(language, index) in featuredLanguages" :key="language.id">
+                            <div class="language-card" :class="'rank-' + (index + 1)">
+                                <div class="rank-badge" x-text="index + 1"></div>
+                                <div class="language-info">
+                                    <div class="language-header">
+                                        <div 
+                                            class="language-color" 
+                                            :style="'background-color: ' + language.color">
+                                        </div>
+                                        <h3 class="language-name" x-text="language.name"></h3>
+                                    </div>
+                                    <p class="language-description" x-text="language.description"></p>
+                                    <div class="language-stats">
+                                        <span class="total-votes" x-text="language.total_votes + ' total votes'"></span>
+                                        <span class="month-votes" x-text="'(' + (language.current_month_points || 0) + ' this month)'"></span>
+                                    </div>
+                                </div>
+                                <div class="vote-section">
+                                    <div class="vote-input">
+                                        <label x-text="'Points (max ' + getMaxPointsForRank(index + 1) + '):'"></label>
+                                        <input 
+                                            type="number" 
+                                            x-model="votePoints[language.id]"
+                                            :max="getMaxPointsForRank(index + 1)"
+                                            min="0"
+                                            class="points-input">
+                                    </div>
+                                    <button 
+                                        class="vote-btn"
+                                        x-on:click="voteForLanguage(language.id, votePoints[language.id])"
+                                        :disabled="!canVote(language.id, votePoints[language.id])"
+                                        x-text="getVoteButtonText(language.id, votePoints[language.id])">
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </section>
+
+                <!-- User Voting Status -->
+                <section class="voting-status" x-show="!loading">
+                    <div class="points-summary">
+                        <h3>Your Voting Status</h3>
+                        <div class="points-info">
+                            <div class="points-used">
+                                <span x-text="pointsUsed"></span> / 10 points used
+                            </div>
+                            <div class="points-remaining">
+                                <span x-text="10 - pointsUsed"></span> points remaining
+                            </div>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" :style="'width: ' + (pointsUsed * 10) + '%'"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Additional Languages -->
+                <section class="additional-section" x-show="!loading && additionalLanguages.length > 0">
+                    <h2 class="section-title">
+                        <span class="emoji">📚</span>
+                        More Languages to Vote
+                    </h2>
+                    <p class="section-description">
+                        Select other programming languages to include in your voting
+                    </p>
+                    
+                    <div class="additional-grid">
+                        <template x-for="language in additionalLanguages" :key="language.id">
+                            <div class="additional-card">
+                                <div class="language-info">
+                                    <div class="language-header">
+                                        <div 
+                                            class="language-color" 
+                                            :style="'background-color: ' + language.color">
+                                        </div>
+                                        <h4 class="language-name" x-text="language.name"></h4>
+                                    </div>
+                                    <p class="language-description" x-text="language.description"></p>
+                                </div>
+                                <button 
+                                    class="select-btn"
+                                    x-on:click="selectAdditionalLanguage(language)"
+                                    x-text="'Add to Ranking'">
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </section>
+
+                <!-- Footer Info -->
+                <footer class="footer-info">
+                    <div class="info-grid">
+                        <div class="info-card">
+                            <h4>How Voting Works</h4>
+                            <ul>
+                                <li>You get 10 points per month to distribute</li>
+                                <li>Maximum 5 points to #1, 3 points to #2, 2 points to #3, etc.</li>
+                                <li>Vote once per month for each language</li>
+                                <li>GitHub authentication required</li>
+                            </ul>
+                        </div>
+                        <div class="info-card">
+                            <h4>Ranking System</h4>
+                            <ul>
+                                <li>Top 20 languages shown in main ranking</li>
+                                <li>35+ additional languages available</li>
+                                <li>Rankings update in real-time</li>
+                                <li>Monthly reset for fair competition</li>
+                            </ul>
+                        </div>
+                    </div>
+                </footer>
+            </div>
         </main>
     </div>
 
