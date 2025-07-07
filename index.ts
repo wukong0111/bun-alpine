@@ -261,33 +261,30 @@ const app = new Elysia()
 			})
 			
 			// Endpoint para votar (requiere autenticación)
-			.post("/vote", ({ body, user }: { body: any; user: any }) => {
+			.post("/vote", ({ body, user, set }: { body: any; user: any; set: any }) => {
 				if (!user) {
-					throw new Error("Authentication required");
+					set.status = 401;
+					return { error: "Authentication required" };
 				}
 				const authenticatedUser = user;
 				const { languageId, points } = body;
 				const month = dbUtils.getCurrentMonth();
 				
 				if (!languageId || !points) {
-					throw new Error("languageId and points are required");
+					set.status = 400;
+					return { error: "languageId and points are required" };
 				}
 				
-				// Validar voto usando el servicio dedicado
-				const validation = VoteService.validateVote(authenticatedUser.userId, languageId, points, month);
+				// Validar voto usando el nuevo sistema acumulativo
+				const validation = VoteService.validateAddVote(authenticatedUser.userId, languageId, points, month);
 				if (!validation.isValid) {
-					throw new Error(validation.error);
+					set.status = 400;
+					return { error: validation.error };
 				}
 				
 				try {
-					// Verificar si es un voto existente
-					const existingVote = db.query(`
-						SELECT points FROM votes 
-						WHERE user_id = ? AND language_id = ? AND vote_month = ?
-					`).get(authenticatedUser.userId, languageId, month) as { points: number } | null;
-					
-					// Insertar o actualizar voto en la base de datos
-					const vote = voteQueries.upsertVote(authenticatedUser.userId, languageId, points, month);
+					// Agregar voto (sistema acumulativo)
+					const vote = voteQueries.addVote(authenticatedUser.userId, languageId, points, month);
 					
 					// Actualizar total de votos del lenguaje
 					languageQueries.updateLanguageVotes(languageId);
@@ -296,9 +293,14 @@ const app = new Elysia()
 					const newMonthlyPoints = voteQueries.getUserMonthlyPoints(authenticatedUser.userId, month);
 					const remainingPoints = 10 - newMonthlyPoints.total_points;
 					
+					// Calcular puntos actuales del lenguaje
+					const languageVotes = voteQueries.getUserMonthlyVotes(authenticatedUser.userId, month)
+						.filter(v => v.language_id === languageId);
+					const languagePoints = languageVotes.reduce((sum, v) => sum + v.points, 0);
+					
 					return {
 						success: true,
-						message: existingVote ? "Vote updated successfully" : "Vote recorded successfully",
+						message: `Added ${points} points! Language now has ${languagePoints} points.`,
 						vote: {
 							id: vote.id,
 							userId: vote.user_id,
@@ -306,11 +308,13 @@ const app = new Elysia()
 							points: vote.points,
 							month: vote.vote_month
 						},
-						remaining_points: remainingPoints
+						remaining_points: remainingPoints,
+						language_total_points: languagePoints
 					};
 				} catch (error) {
 					console.error("Error recording vote:", error);
-					throw new Error("Failed to record vote. Please try again.");
+					set.status = 500;
+					return { error: "Failed to record vote. Please try again." };
 				}
 			})
 			

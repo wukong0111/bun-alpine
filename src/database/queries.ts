@@ -179,6 +179,12 @@ export const voteQueries = {
     return result;
   },
 
+  // Agregar puntos a un lenguaje (sistema acumulativo)
+  addVote(userId: number, languageId: number, points: number, month: string): Vote {
+    // Simplemente insertar un nuevo voto - el sistema permite múltiples votos por lenguaje
+    return this.insertVote(userId, languageId, points, month);
+  },
+
   // Actualizar un voto existente
   updateVote(userId: number, languageId: number, points: number, month: string): Vote {
     const result = db.query(`

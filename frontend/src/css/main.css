@@ -578,6 +578,86 @@
             opacity: 0.6;
         }
 
+        /* ===== NEW CUMULATIVE VOTING STYLES ===== */
+        .language-points {
+            display: flex;
+            justify-content: center;
+            margin-bottom: var(--space-sm);
+        }
+
+        .current-points {
+            font-size: 0.9rem;
+            color: var(--neutral-200);
+            font-weight: 600;
+            padding: 4px 12px;
+            background: hsla(220, 20%, 98%, 0.05);
+            border-radius: var(--radius-md);
+            border: 1px solid hsla(220, 20%, 98%, 0.1);
+        }
+
+        .vote-controls {
+            display: flex;
+            gap: var(--space-sm);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .points-select {
+            padding: 6px 10px;
+            background: hsla(220, 20%, 98%, 0.05);
+            border: 1px solid hsla(220, 20%, 98%, 0.2);
+            border-radius: var(--radius-md);
+            color: var(--neutral-50);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            transition: all 0.2s ease;
+        }
+
+        .points-select:focus {
+            outline: none;
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 2px hsla(var(--primary-hue), 70%, 55%, 0.2);
+        }
+
+        .points-select option {
+            background: var(--neutral-800);
+            color: var(--neutral-50);
+            padding: 4px 8px;
+        }
+
+        .add-points-btn {
+            padding: 8px 16px;
+            border: 1px solid hsla(220, 20%, 98%, 0.2);
+            border-radius: var(--radius-md);
+            background: hsla(220, 20%, 98%, 0.05);
+            color: var(--neutral-100);
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(8px);
+            white-space: nowrap;
+        }
+
+        .add-points-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
+            border-color: var(--primary-500);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px hsla(var(--primary-hue), 70%, 55%, 0.3);
+        }
+
+        .add-points-btn:disabled {
+            background: var(--neutral-800);
+            border-color: var(--neutral-700);
+            color: var(--neutral-300);
+            cursor: not-allowed;
+            opacity: 0.6;
+            transform: none;
+        }
+
+
         /* ===== VOTING STATUS ===== */
         .voting-status {
             margin-bottom: var(--space-2xl);

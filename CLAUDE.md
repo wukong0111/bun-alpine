@@ -163,8 +163,8 @@ This project uses a **separated backend/frontend architecture** with independent
 // ❌ Bad - Business logic in route handler
 .post("/vote", ({ body, user }) => {
   if (body.points < 1 || body.points > 5) throw new Error("Invalid points");
-  const votes = getUserVotes(user.id);
-  const slot5Used = votes.some(v => v.points === 5);
+  const monthlyPoints = getUserMonthlyPoints(user.id);
+  if (monthlyPoints.total + body.points > 10) throw new Error("Too many points");
   // ... complex logic here
 })
 ```
@@ -177,13 +177,24 @@ This project uses a **separated backend/frontend architecture** with independent
 ```typescript
 // ✅ Good - Service handles business logic
 export class VoteService {
-  static validateVoteSlots(userId: number, languageId: number, points: number): ValidationResult {
-    const userVotes = voteQueries.getUserMonthlyVotes(userId, month);
-    const slot5Used = userVotes.some(v => v.points === 5 && v.language_id !== languageId);
-    
-    if (points === 5 && slot5Used) {
-      return { isValid: false, error: "5-point slot already used" };
+  static validateVote(userId: number, languageId: number, points: number, month: string): ValidationResult {
+    // Basic validation
+    if (points < 1 || points > 5) {
+      return { isValid: false, error: "Points must be between 1 and 5" };
     }
+
+    // Check total points limit
+    const monthlyPoints = voteQueries.getUserMonthlyPoints(userId, month);
+    const existingVote = voteQueries.getUserMonthlyVotes(userId, month)
+      .find(v => v.language_id === languageId);
+    
+    const currentVotePoints = existingVote ? existingVote.points : 0;
+    const pointsDifference = points - currentVotePoints;
+
+    if (monthlyPoints.total_points + pointsDifference > 10) {
+      return { isValid: false, error: "Not enough points remaining" };
+    }
+    
     return { isValid: true };
   }
 }
@@ -225,8 +236,8 @@ async voteForLanguage(languageId: number, points: number) {
 
 // ❌ Bad - Business logic in frontend
 canVote(languageId: number, points: number): boolean {
-  const slot5Used = Object.values(this.votes).includes(5);
-  if (points === 5 && slot5Used) return false; // Business logic belongs in backend
+  const totalUsed = Object.values(this.votes).reduce((sum, p) => sum + p, 0);
+  if (totalUsed + points > 10) return false; // Business logic belongs in backend
   return true;
 }
 ```

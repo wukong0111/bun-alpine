@@ -87,6 +87,7 @@ interface RankingApp {
   pointsUsed: number;
   votingInProgress: boolean;
   refreshingRanking: boolean;
+  selectedPoints: Record<number, number>;
   
   // Métodos principales
   init(): Promise<void>;
@@ -101,13 +102,16 @@ interface RankingApp {
   logout(): Promise<void>;
   
   // Sistema de votación
-  getMaxPointsForVote(voteOrder: number): number;
-  getCurrentVoteOrder(languageId: number): number;
-  getMaxPointsForLanguage(_languageId: number): number;
+  getLanguagePoints(languageId: number): number;
+  canAddPoints(languageId: number, pointsToAdd: number): boolean;
+  getAddPointsButtonText(languageId: number, pointsToAdd: number): string;
+  addPointsToLanguage(languageId: number, points: number): Promise<void>;
+  updatePointsUsed(): void;
+  
+  // Funciones legacy (mantener compatibilidad)
   canVote(languageId: number, points: number): boolean;
   getVoteButtonText(languageId: number, points: number): string;
   voteForLanguage(languageId: number, points: number): Promise<void>;
-  updatePointsUsed(): void;
   updateLanguageRanking(): Promise<void>;
   refreshRanking(): Promise<void>;
   
@@ -142,6 +146,7 @@ const rankingApp: RankingApp = {
   pointsUsed: 0,
   votingInProgress: false,
   refreshingRanking: false,
+  selectedPoints: {},
 
   // Inicialización
   async init() {
@@ -204,29 +209,119 @@ const rankingApp: RankingApp = {
     }
   },
 
-  // Obtener máximo de puntos según orden de votación
-  getMaxPointsForVote(voteOrder: number): number {
-    if (voteOrder === 1) return 5; // Primer voto: 5 puntos
-    if (voteOrder === 2) return 3; // Segundo voto: 3 puntos
-    if (voteOrder === 3) return 2; // Tercer voto: 2 puntos
-    return 1; // Resto de votos: 1 punto
+  // Obtener puntos actuales de un lenguaje (sistema acumulativo)
+  getLanguagePoints(languageId: number): number {
+    // En el sistema acumulativo, necesitamos sumar todos los votos por este lenguaje
+    // Por ahora usamos votePoints como cache, pero idealmente vendría del backend
+    return this.votePoints[languageId] || 0;
   },
 
-  // Obtener orden actual de voto para un lenguaje
-  getCurrentVoteOrder(languageId: number): number {
-    const currentPoints = this.votePoints[languageId] || 0;
-    if (currentPoints === 0) {
-      // Nuevo voto - calcular orden basado en votos existentes
-      return Object.keys(this.votePoints).length + 1;
+  // Verificar si puede agregar puntos (sistema acumulativo)
+  canAddPoints(languageId: number, pointsToAdd: number): boolean {
+    if (!this.isAuthenticated) return false;
+    if (this.votingInProgress) return false;
+    if (!pointsToAdd || pointsToAdd <= 0 || pointsToAdd > 5) return false;
+
+    // Verificar límite por lenguaje (máximo 5 puntos)
+    const currentLanguagePoints = this.getLanguagePoints(languageId);
+    if (currentLanguagePoints + pointsToAdd > 5) return false;
+
+    // Verificar límite total mensual (máximo 10 puntos)
+    if (this.pointsUsed + pointsToAdd > 10) return false;
+
+    return true;
+  },
+
+  // Texto del botón para agregar puntos
+  getAddPointsButtonText(languageId: number, pointsToAdd: number): string {
+    if (!this.isAuthenticated) return 'Sign in to vote';
+    if (this.votingInProgress) return 'Voting...';
+    if (!pointsToAdd || pointsToAdd <= 0) return 'Invalid points';
+
+    const currentLanguagePoints = this.getLanguagePoints(languageId);
+    
+    if (currentLanguagePoints + pointsToAdd > 5) {
+      const remaining = 5 - currentLanguagePoints;
+      return remaining > 0 ? `${remaining} left` : 'Max reached';
     }
-    // Ya tiene voto - mantener orden
-    return 1; // Simplificado por ahora
+
+    if (this.pointsUsed + pointsToAdd > 10) {
+      const remaining = 10 - this.pointsUsed;
+      return remaining > 0 ? `${remaining} left` : 'No points';
+    }
+
+    return `+${pointsToAdd}`;
   },
 
-  // Obtener máximo de puntos permitido para un lenguaje
-  getMaxPointsForLanguage(_languageId: number): number {
-    // El frontend solo permite hasta 5 puntos, el backend valida la lógica de slots
-    return 5;
+  // Agregar puntos a un lenguaje (sistema acumulativo)
+  async addPointsToLanguage(languageId: number, points: number) {
+    if (!this.isAuthenticated) {
+      this.login();
+      return;
+    }
+
+    if (!this.canAddPoints(languageId, points)) {
+      // Mostrar mensaje informativo específico
+      const currentLanguagePoints = this.getLanguagePoints(languageId);
+      
+      if (currentLanguagePoints + points > 5) {
+        const remaining = 5 - currentLanguagePoints;
+        if (remaining > 0) {
+          this.showInfoMessage(`This language already has ${currentLanguagePoints} points. You can add ${remaining} more points maximum.`);
+        } else {
+          this.showInfoMessage(`This language already has the maximum of 5 points this month.`);
+        }
+      } else if (this.pointsUsed + points > 10) {
+        const remaining = 10 - this.pointsUsed;
+        if (remaining > 0) {
+          this.showInfoMessage(`You have used ${this.pointsUsed}/10 points this month. You can only add ${remaining} more points.`);
+        } else {
+          this.showInfoMessage(`You have used all 10 points for this month. Come back next month to vote again!`);
+        }
+      }
+      return;
+    }
+
+    const numPoints = typeof points === 'string' ? parseInt(points) : points;
+    this.votingInProgress = true;
+
+    try {
+      const response = await fetch('/app/vote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          languageId,
+          points: numPoints
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.message || 'Failed to vote');
+      }
+
+      const data = await response.json();
+      
+      // Actualizar estado local
+      this.votePoints[languageId] = data.language_total_points || (this.votePoints[languageId] || 0) + numPoints;
+      this.updatePointsUsed();
+      
+      // Mostrar mensaje de éxito
+      this.showSuccessMessage(data.message || `Added ${numPoints} points successfully!`);
+      
+      // Refrescar datos
+      await this.loadUserVotes();
+      await this.updateLanguageRanking();
+      
+    } catch (error) {
+      console.error('Error voting:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error submitting vote. Please try again.';
+      this.showErrorMessage(errorMessage);
+    } finally {
+      this.votingInProgress = false;
+    }
   },
 
   // Verificar si puede votar
@@ -525,6 +620,7 @@ const rankingApp: RankingApp = {
         this.user = null;
         this.votePoints = {};
         this.pointsUsed = 0;
+        this.selectedPoints = {};
         
         // Mostrar confirmación de logout
         this.showSuccessMessage('Logged out successfully');
@@ -572,8 +668,13 @@ Alpine.data('rankingApp', () => ({
   async logout() {
     return rankingApp.logout.call(this);
   },
+  async addPointsToLanguage(languageId: number, points: number) {
+    return rankingApp.addPointsToLanguage.call(this, languageId, points);
+  },
   // Otras funciones que no modifican estado pueden usar bind
-  getMaxPointsForLanguage: rankingApp.getMaxPointsForLanguage.bind(rankingApp),
+  getLanguagePoints: rankingApp.getLanguagePoints.bind(rankingApp),
+  canAddPoints: rankingApp.canAddPoints.bind(rankingApp),
+  getAddPointsButtonText: rankingApp.getAddPointsButtonText.bind(rankingApp),
   canVote: rankingApp.canVote.bind(rankingApp),
   getVoteButtonText: rankingApp.getVoteButtonText.bind(rankingApp),
   login: rankingApp.login.bind(rankingApp)

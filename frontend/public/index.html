@@ -118,21 +118,27 @@
                                     </div>
                                 </div>
                                 <div class="vote-section">
-                                    <div class="vote-input">
-                                        <label x-text="'Points (max ' + getMaxPointsForLanguage(language.id) + '):'"></label>
-                                        <input 
-                                            type="number" 
-                                            x-model="votePoints[language.id]"
-                                            :max="getMaxPointsForLanguage(language.id)"
-                                            min="0"
-                                            class="points-input">
+                                    <div class="language-points">
+                                        <span class="current-points" x-text="getLanguagePoints(language.id) + ' / 5 points'"></span>
                                     </div>
-                                    <button 
-                                        class="vote-btn"
-                                        x-on:click="voteForLanguage(language.id, votePoints[language.id])"
-                                        :disabled="!canVote(language.id, votePoints[language.id])"
-                                        x-text="getVoteButtonText(language.id, votePoints[language.id])">
-                                    </button>
+                                    <div class="vote-controls">
+                                        <select 
+                                            class="points-select"
+                                            x-model="selectedPoints[language.id]"
+                                            x-init="selectedPoints[language.id] = 1">
+                                            <option value="1">1 point</option>
+                                            <option value="2">2 points</option>
+                                            <option value="3">3 points</option>
+                                            <option value="4">4 points</option>
+                                            <option value="5">5 points</option>
+                                        </select>
+                                        <button 
+                                            class="add-points-btn"
+                                            x-on:click="addPointsToLanguage(language.id, parseInt(selectedPoints[language.id] || 1))"
+                                            :disabled="!canAddPoints(language.id, parseInt(selectedPoints[language.id] || 1))"
+                                            x-text="getAddPointsButtonText(language.id, parseInt(selectedPoints[language.id] || 1))">
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </template>
@@ -200,21 +206,27 @@
                                     </div>
                                 </div>
                                 <div class="vote-section">
-                                    <div class="vote-input">
-                                        <label x-text="'Points (max ' + getMaxPointsForLanguage(language.id) + '):'"></label>
-                                        <input 
-                                            type="number" 
-                                            x-model="votePoints[language.id]"
-                                            :max="getMaxPointsForLanguage(language.id)"
-                                            min="0"
-                                            class="points-input">
+                                    <div class="language-points">
+                                        <span class="current-points" x-text="getLanguagePoints(language.id) + ' / 5 points'"></span>
                                     </div>
-                                    <button 
-                                        class="vote-btn"
-                                        x-on:click="voteForLanguage(language.id, votePoints[language.id])"
-                                        :disabled="!canVote(language.id, votePoints[language.id])"
-                                        x-text="getVoteButtonText(language.id, votePoints[language.id])">
-                                    </button>
+                                    <div class="vote-controls">
+                                        <select 
+                                            class="points-select"
+                                            x-model="selectedPoints[language.id]"
+                                            x-init="selectedPoints[language.id] = 1">
+                                            <option value="1">1 point</option>
+                                            <option value="2">2 points</option>
+                                            <option value="3">3 points</option>
+                                            <option value="4">4 points</option>
+                                            <option value="5">5 points</option>
+                                        </select>
+                                        <button 
+                                            class="add-points-btn"
+                                            x-on:click="addPointsToLanguage(language.id, parseInt(selectedPoints[language.id] || 1))"
+                                            :disabled="!canAddPoints(language.id, parseInt(selectedPoints[language.id] || 1))"
+                                            x-text="getAddPointsButtonText(language.id, parseInt(selectedPoints[language.id] || 1))">
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </template>
@@ -228,8 +240,8 @@
                             <h4>How Voting Works</h4>
                             <ul>
                                 <li>You get 10 points per month to distribute</li>
-                                <li>Maximum 5 points to your 1st vote, 3 to your 2nd, 2 to your 3rd, 1 to rest</li>
-                                <li>Vote once per month for each language</li>
+                                <li>Maximum 5 points per language per month</li>
+                                <li>Add points cumulatively (1-5 at a time)</li>
                                 <li>GitHub authentication required</li>
                             </ul>
                         </div>

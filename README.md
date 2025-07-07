@@ -6,7 +6,7 @@ A modern full-stack TypeScript application for community-driven programming lang
 
 - **📊 Monthly Rankings** - Community-driven ranking of 55+ programming languages
 - **🔐 GitHub Authentication** - Secure OAuth login with GitHub accounts
-- **🗳️ Smart Voting System** - 10 points per month with slot-based allocation (5+3+2+1...)
+- **🗳️ Cumulative Voting System** - 10 points per month, max 5 points per language, add 1-5 points at a time
 - **⚡ Real-time Updates** - Reactive UI updates without page reloads
 - **🔒 Server-side Validation** - All business logic secured in backend
 - **📱 Responsive Design** - Modern UI that works on all devices
@@ -154,7 +154,7 @@ Frontend static files are served from `/` (root path).
 ### Backend Features
 - **GitHub OAuth Integration** - Secure authentication with GitHub accounts
 - **JWT Session Management** - HTTP-only cookies with secure token handling
-- **Vote Validation System** - Server-side business logic for voting slots (5, 3, 2, 1 points)
+- **Vote Validation System** - Server-side business logic for cumulative voting limits
 - **SQLite Database** - Native Bun SQLite with migrations and seeding
 - **Direct TypeScript execution** - No build step needed
 - **API documentation** - Auto-generated Swagger docs
