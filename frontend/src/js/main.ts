@@ -59,6 +59,15 @@ interface UserVotesResponse {
   month: string;
 }
 
+// Toast notification types
+type ToastType = 'success' | 'error' | 'warning' | 'info';
+
+interface ToastOptions {
+  title?: string;
+  duration?: number;
+  closable?: boolean;
+}
+
 interface RankingApp {
   // Estado de carga
   loading: boolean;
@@ -94,15 +103,23 @@ interface RankingApp {
   // Sistema de votación
   getMaxPointsForVote(voteOrder: number): number;
   getCurrentVoteOrder(languageId: number): number;
-  getMaxPointsForLanguage(languageId: number): number;
+  getMaxPointsForLanguage(_languageId: number): number;
   canVote(languageId: number, points: number): boolean;
   getVoteButtonText(languageId: number, points: number): string;
   voteForLanguage(languageId: number, points: number): Promise<void>;
   updatePointsUsed(): void;
   updateLanguageRanking(): Promise<void>;
   refreshRanking(): Promise<void>;
-  showSuccessMessage(message: string): void;
-  showErrorMessage(message: string): void;
+  
+  // Sistema de notificaciones toast
+  showToast(message: string, type?: ToastType, options?: ToastOptions): string | undefined;
+  hideToast(toastId: string): void;
+  getToastIcon(type: ToastType): string;
+  getToastTitle(type: ToastType): string;
+  showSuccessMessage(message: string, options?: ToastOptions): void;
+  showErrorMessage(message: string, options?: ToastOptions): void;
+  showWarningMessage(message: string, options?: ToastOptions): void;
+  showInfoMessage(message: string, options?: ToastOptions): void;
   
 }
 
@@ -152,7 +169,7 @@ const rankingApp: RankingApp = {
     const error = params.get('error');
     
     if (error === 'auth_failed') {
-      alert('Authentication failed. Please try again.');
+      this.showErrorMessage('Authentication failed. Please try again.');
       // Limpiar la URL sin recargar
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -195,8 +212,19 @@ const rankingApp: RankingApp = {
     return 1; // Resto de votos: 1 punto
   },
 
+  // Obtener orden actual de voto para un lenguaje
+  getCurrentVoteOrder(languageId: number): number {
+    const currentPoints = this.votePoints[languageId] || 0;
+    if (currentPoints === 0) {
+      // Nuevo voto - calcular orden basado en votos existentes
+      return Object.keys(this.votePoints).length + 1;
+    }
+    // Ya tiene voto - mantener orden
+    return 1; // Simplificado por ahora
+  },
+
   // Obtener máximo de puntos permitido para un lenguaje
-  getMaxPointsForLanguage(languageId: number): number {
+  getMaxPointsForLanguage(_languageId: number): number {
     // El frontend solo permite hasta 5 puntos, el backend valida la lógica de slots
     return 5;
   },
@@ -276,7 +304,7 @@ const rankingApp: RankingApp = {
     } catch (error) {
       console.error('Error voting:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error submitting vote. Please try again.';
-      alert(errorMessage);
+      this.showErrorMessage(errorMessage);
     } finally {
       this.votingInProgress = false;
     }
@@ -335,15 +363,111 @@ const rankingApp: RankingApp = {
     }
   },
   
-  // Mostrar mensajes de éxito (más elegante que alert)
-  showSuccessMessage(message: string) {
-    // Por ahora usamos alert, pero podríamos implementar un toast
-    alert(message);
+  // Sistema de Toast Notifications
+  showToast(message: string, type: ToastType = 'info', options: ToastOptions = {}) {
+    const {
+      title = this.getToastTitle(type),
+      duration = 5000,
+      closable = true
+    } = options;
+
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    // Crear elemento toast
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    // Generar ID único para el toast
+    const toastId = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    toast.id = toastId;
+
+    // Crear contenido del toast
+    toast.innerHTML = `
+      <div class="toast-icon">${this.getToastIcon(type)}</div>
+      <div class="toast-content">
+        <div class="toast-title">${title}</div>
+        <div class="toast-message">${message}</div>
+      </div>
+      ${closable ? '<button class="toast-close" aria-label="Close">&times;</button>' : ''}
+    `;
+
+    // Agregar al container
+    container.appendChild(toast);
+
+    // Configurar cierre manual
+    if (closable) {
+      const closeBtn = toast.querySelector('.toast-close');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => this.hideToast(toastId));
+      }
+    }
+
+    // Mostrar toast con animación
+    setTimeout(() => {
+      toast.classList.add('show');
+    }, 10);
+
+    // Auto-ocultar después del duration
+    if (duration > 0) {
+      setTimeout(() => {
+        this.hideToast(toastId);
+      }, duration);
+    }
+
+    return toastId;
+  },
+
+  hideToast(toastId: string) {
+    const toast = document.getElementById(toastId);
+    if (!toast) return;
+
+    toast.classList.remove('show');
+    toast.classList.add('hide');
+
+    // Remover del DOM después de la animación
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  },
+
+  getToastIcon(type: ToastType): string {
+    const icons = {
+      success: '✓',
+      error: '✕',
+      warning: '!',
+      info: 'i'
+    };
+    return icons[type] || icons.info;
+  },
+
+  getToastTitle(type: ToastType): string {
+    const titles = {
+      success: 'Success',
+      error: 'Error',
+      warning: 'Warning',
+      info: 'Info'
+    };
+    return titles[type] || titles.info;
+  },
+
+  // Métodos de conveniencia para diferentes tipos de toast
+  showSuccessMessage(message: string, options?: ToastOptions) {
+    this.showToast(message, 'success', options);
   },
   
-  // Mostrar mensajes de error
-  showErrorMessage(message: string) {
-    alert(message);
+  showErrorMessage(message: string, options?: ToastOptions) {
+    this.showToast(message, 'error', { duration: 7000, ...options });
+  },
+
+  showWarningMessage(message: string, options?: ToastOptions) {
+    this.showToast(message, 'warning', options);
+  },
+
+  showInfoMessage(message: string, options?: ToastOptions) {
+    this.showToast(message, 'info', options);
   },
 
   // Verificar estado de autenticación
@@ -402,6 +526,9 @@ const rankingApp: RankingApp = {
         this.votePoints = {};
         this.pointsUsed = 0;
         
+        // Mostrar confirmación de logout
+        this.showSuccessMessage('Logged out successfully');
+        
         // No recargar la página, solo limpiar estado
         // Alpine.js se encargará de actualizar la UI reactivamente
       }
@@ -415,8 +542,13 @@ const rankingApp: RankingApp = {
 const originalVotePoints = rankingApp.votePoints;
 rankingApp.votePoints = new Proxy(originalVotePoints, {
   set(target, property, value) {
-    target[property as number] = value;
-    rankingApp.updatePointsUsed();
+    if (typeof property === 'string') {
+      const numKey = parseInt(property);
+      if (!isNaN(numKey)) {
+        target[numKey] = value as number;
+        rankingApp.updatePointsUsed();
+      }
+    }
     return true;
   }
 });
@@ -428,7 +560,7 @@ window.rankingApp = rankingApp;
 Alpine.data('rankingApp', () => ({
   ...rankingApp,
   // Funciones que operan directamente en el contexto de Alpine (this se refiere al estado de Alpine)
-  async voteForLanguage(languageId, points) {
+  async voteForLanguage(languageId: number, points: number) {
     return rankingApp.voteForLanguage.call(this, languageId, points);
   },
   async refreshRanking() {
@@ -437,12 +569,15 @@ Alpine.data('rankingApp', () => ({
   async updateLanguageRanking() {
     return rankingApp.updateLanguageRanking.call(this);
   },
+  async logout() {
+    return rankingApp.logout.call(this);
+  },
   // Otras funciones que no modifican estado pueden usar bind
   getMaxPointsForLanguage: rankingApp.getMaxPointsForLanguage.bind(rankingApp),
   canVote: rankingApp.canVote.bind(rankingApp),
   getVoteButtonText: rankingApp.getVoteButtonText.bind(rankingApp),
-  login: rankingApp.login.bind(rankingApp),
-  logout: rankingApp.logout.bind(rankingApp)
+  login: rankingApp.login.bind(rankingApp)
+  // logout usa la implementación personalizada arriba
 }));
 
 Alpine.start();
