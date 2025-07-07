@@ -1,0 +1,149 @@
+name: Database Backup
+
+on:
+  schedule:
+    # Ejecutar diariamente a las 2:00 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    # Permitir ejecución manual
+    inputs:
+      reason:
+        description: 'Reason for manual backup'
+        required: false
+        default: 'Manual backup'
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d-%H-%M-%S')" >> $GITHUB_OUTPUT
+        
+      - name: Create database backup
+        id: backup
+        run: |
+          # Obtener backup desde Railway
+          response=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.ADMIN_API_KEY }}" \
+            -H "Accept: application/gzip" \
+            -o "backup-${{ steps.date.outputs.date }}.sql.gz" \
+            "${{ secrets.RAILWAY_APP_URL }}/app/admin/backup")
+          
+          http_code=$(echo "$response" | tail -n1)
+          
+          if [ "$http_code" -ne 200 ]; then
+            echo "Backup failed with HTTP code: $http_code"
+            exit 1
+          fi
+          
+          # Verificar que el archivo se creó correctamente
+          if [ ! -f "backup-${{ steps.date.outputs.date }}.sql.gz" ]; then
+            echo "Backup file was not created"
+            exit 1
+          fi
+          
+          # Obtener tamaño del archivo
+          backup_size=$(stat -c%s "backup-${{ steps.date.outputs.date }}.sql.gz")
+          echo "backup_size=$backup_size" >> $GITHUB_OUTPUT
+          echo "filename=backup-${{ steps.date.outputs.date }}.sql.gz" >> $GITHUB_OUTPUT
+          
+          echo "✅ Backup created successfully: $backup_size bytes"
+          
+      - name: Get app stats
+        id: stats
+        run: |
+          # Obtener estadísticas de la aplicación
+          stats=$(curl -s \
+            -H "Authorization: Bearer ${{ secrets.ADMIN_API_KEY }}" \
+            -H "Accept: application/json" \
+            "${{ secrets.RAILWAY_APP_URL }}/app/admin/stats")
+          
+          echo "App stats: $stats"
+          
+          # Extraer información relevante para el release
+          total_users=$(echo "$stats" | jq -r '.monthly_stats.total_users // 0')
+          total_votes=$(echo "$stats" | jq -r '.monthly_stats.total_votes // 0')
+          current_month=$(echo "$stats" | jq -r '.current_month // "unknown"')
+          
+          echo "users=$total_users" >> $GITHUB_OUTPUT
+          echo "votes=$total_votes" >> $GITHUB_OUTPUT
+          echo "month=$current_month" >> $GITHUB_OUTPUT
+          
+      - name: Create release with backup
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: backup-${{ steps.date.outputs.date }}
+          name: Database Backup - ${{ steps.date.outputs.date }}
+          body: |
+            ## 🗄️ Database Backup
+            
+            **Backup Date:** ${{ steps.date.outputs.date }}
+            **Backup Size:** ${{ steps.backup.outputs.backup_size }} bytes
+            **Month:** ${{ steps.stats.outputs.month }}
+            **Total Users:** ${{ steps.stats.outputs.users }}
+            **Total Votes:** ${{ steps.stats.outputs.votes }}
+            
+            ### 📋 Backup Details
+            - **Environment:** Production
+            - **Format:** SQLite dump (gzipped)
+            - **Automated:** ${{ github.event_name == 'schedule' && 'Yes' || 'No' }}
+            - **Reason:** ${{ github.event.inputs.reason || 'Scheduled backup' }}
+            
+            ### 🔧 Restore Instructions
+            1. Download the backup file
+            2. Extract: `gunzip backup-*.sql.gz`
+            3. Parse JSON and extract sqlDump
+            4. Run in development: `bun scripts/restore-backup.ts backup-*.sql`
+            
+            ---
+            *This backup was created automatically by GitHub Actions*
+          files: |
+            backup-${{ steps.date.outputs.date }}.sql.gz
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+          
+      - name: Cleanup old backups
+        run: |
+          # Mantener solo los últimos 30 backups
+          # Obtener lista de releases de backup
+          releases=$(curl -s \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases")
+          
+          # Filtrar releases de backup y obtener los más antiguos
+          backup_releases=$(echo "$releases" | jq -r '
+            [.[] | select(.tag_name | startswith("backup-"))] |
+            sort_by(.created_at) |
+            reverse |
+            .[30:] |
+            .[] |
+            .id
+          ')
+          
+          # Eliminar releases antiguos
+          for release_id in $backup_releases; do
+            if [ -n "$release_id" ] && [ "$release_id" != "null" ]; then
+              echo "Deleting old backup release: $release_id"
+              curl -s -X DELETE \
+                -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/${{ github.repository }}/releases/$release_id"
+            fi
+          done
+          
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Backup failed!"
+          echo "Please check the logs and ensure:"
+          echo "1. ADMIN_API_KEY secret is configured"
+          echo "2. RAILWAY_APP_URL secret is configured"
+          echo "3. Railway app is running and accessible"
+          echo "4. Admin API key is valid"

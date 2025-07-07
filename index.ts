@@ -13,6 +13,8 @@ import { db } from "./src/database/database";
 import { GitHubAuth } from "./src/auth/github";
 import { jwtConfig, cookieConfig, createSessionToken, verifySessionToken, requireAuth } from "./src/auth/session";
 import { VoteService } from "./src/services/voteService";
+import { requireAdmin } from "./src/middleware/admin";
+import { createDatabaseBackup } from "./src/utils/backup";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 
@@ -347,7 +349,96 @@ const app = new Elysia()
 					vote: { userId, languageId, points, month },
 					remaining_points: 10 - monthlyPoints.total_points - points
 				};
-			}),
+			})
+			
+			// Endpoints de administración
+			.group("/admin", (app) =>
+				app
+					.get("/backup", async ({ headers }) => {
+						try {
+							// Verificar autenticación de admin
+							const adminApiKey = process.env.ADMIN_API_KEY;
+							if (!adminApiKey) {
+								throw new Error('Admin API key not configured');
+							}
+							
+							const authHeader = headers.authorization;
+							if (!authHeader) {
+								throw new Error('Authorization header required');
+							}
+							
+							const [scheme, token] = authHeader.split(' ');
+							if (scheme !== 'Bearer' || !token || token !== adminApiKey) {
+								throw new Error('Invalid admin API key');
+							}
+							
+							// Crear backup
+							const backup = await createDatabaseBackup();
+							
+							// Retornar archivo comprimido
+							return new Response(backup.data, {
+								headers: {
+									'Content-Type': 'application/gzip',
+									'Content-Disposition': `attachment; filename="${backup.filename}"`,
+									'Content-Length': backup.data.length.toString(),
+									'X-Backup-Timestamp': backup.metadata.timestamp,
+									'X-Backup-Version': backup.metadata.version,
+									'X-Backup-Records': JSON.stringify(backup.metadata.recordCount),
+								}
+							});
+						} catch (error) {
+							console.error('Backup error:', error);
+							return {
+								error: 'Backup failed',
+								message: error instanceof Error ? error.message : 'Unknown error'
+							};
+						}
+					})
+					
+					.get("/stats", async ({ headers }) => {
+						try {
+							// Verificar autenticación de admin
+							const adminApiKey = process.env.ADMIN_API_KEY;
+							if (!adminApiKey) {
+								throw new Error('Admin API key not configured');
+							}
+							
+							const authHeader = headers.authorization;
+							if (!authHeader) {
+								throw new Error('Authorization header required');
+							}
+							
+							const [scheme, token] = authHeader.split(' ');
+							if (scheme !== 'Bearer' || !token || token !== adminApiKey) {
+								throw new Error('Invalid admin API key');
+							}
+							
+							// Obtener estadísticas detalladas
+							const stats = getDbStats();
+							const currentMonth = dbUtils.getCurrentMonth();
+							const monthlyStats = voteQueries.getCurrentMonthStats();
+							
+							return {
+								timestamp: new Date().toISOString(),
+								environment: process.env.NODE_ENV || 'development',
+								database: stats,
+								current_month: currentMonth,
+								monthly_stats: monthlyStats,
+								system: {
+									platform: process.platform,
+									version: process.version,
+									uptime: process.uptime()
+								}
+							};
+						} catch (error) {
+							console.error('Stats error:', error);
+							return {
+								error: 'Stats failed',
+								message: error instanceof Error ? error.message : 'Unknown error'
+							};
+						}
+					})
+			),
 	)
 	.listen(process.env.PORT ?? 3000);
 

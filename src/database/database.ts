@@ -2,9 +2,11 @@ import { Database } from "bun:sqlite";
 import path from "path";
 
 // Configurar ruta de la base de datos
-const dbPath = process.env.NODE_ENV === "production" 
-  ? "./data/ranking.db" 
-  : "./src/database/ranking.db";
+const dbPath = process.env.DATABASE_PATH || (
+  process.env.NODE_ENV === "production" 
+    ? "./data/ranking.db" 
+    : "./src/database/ranking.db"
+);
 
 // Crear directorio si no existe
 const dbDir = path.dirname(dbPath);

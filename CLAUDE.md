@@ -269,6 +269,78 @@ bun run build          # Build frontend for production
 bun run start          # Start production server
 ```
 
+## Environment Configuration
+
+### Development Environment
+```bash
+# .env file
+NODE_ENV=development
+DATABASE_PATH=./src/database/ranking.db
+GITHUB_CLIENT_ID=your_dev_client_id
+GITHUB_CLIENT_SECRET=your_dev_client_secret
+BASE_URL=http://localhost:3000
+JWT_SECRET=your_jwt_secret
+```
+
+### Production Environment (Railway)
+```bash
+# Environment variables in Railway dashboard
+NODE_ENV=production
+DATABASE_PATH=./data/ranking.db
+GITHUB_CLIENT_ID=your_prod_client_id
+GITHUB_CLIENT_SECRET=your_prod_client_secret
+BASE_URL=https://your-domain.com
+JWT_SECRET=your_strong_jwt_secret
+```
+
+### Database Configuration
+- **Development**: SQLite database stored in `src/database/ranking.db`
+- **Production**: SQLite database stored in `data/ranking.db`
+- **Path Priority**: Uses `DATABASE_PATH` environment variable, fallback to NODE_ENV-based paths
+- **Security**: Reset script blocked in production environment
+
+### GitHub OAuth Setup
+1. **Development App**: 
+   - Callback URL: `http://localhost:3000/app/auth/callback`
+   - For local development only
+2. **Production App**: 
+   - Callback URL: `https://your-domain.com/app/auth/callback`
+   - Separate credentials for production security
+
+## Database Backup System
+
+### Automated Backups
+- **Schedule**: Daily at 2:00 AM UTC via GitHub Actions
+- **Storage**: GitHub Releases with retention of 30 backups
+- **Format**: Compressed SQL dumps with metadata
+- **Authentication**: Admin API key required
+
+### Backup Endpoints
+- `GET /app/admin/backup` - Download database backup (requires admin auth)
+- `GET /app/admin/stats` - Get database statistics (requires admin auth)
+
+### Manual Backup
+```bash
+# Using curl with admin API key
+curl -H "Authorization: Bearer YOUR_ADMIN_API_KEY" \
+     -o backup.sql.gz \
+     https://your-domain.com/app/admin/backup
+```
+
+### Restore Process (Development Only)
+```bash
+# Download backup from GitHub Releases
+wget https://github.com/your-repo/releases/download/backup-YYYY-MM-DD-HH-MM-SS/backup-YYYY-MM-DD-HH-MM-SS.sql.gz
+
+# Restore in development
+bun scripts/restore-backup.ts backup-YYYY-MM-DD-HH-MM-SS.sql.gz
+```
+
+### GitHub Secrets Required
+- `ADMIN_API_KEY` - Admin authentication key
+- `RAILWAY_APP_URL` - Production app URL
+- `GITHUB_TOKEN` - Automatic (for release management)
+
 ### Individual Projects
 ```bash
 # Backend only
