@@ -36,7 +36,7 @@ const app = new Elysia()
 						defaultSrc: ["'self'"],
 						styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
 						scriptSrc: ["'self'", "'unsafe-eval'"], // Necesario para Alpine.js en desarrollo
-						imgSrc: ["'self'", "data:", "https:"],
+						imgSrc: ["'self'", "data:", "https://avatars.githubusercontent.com"],
 						connectSrc: ["'self'"],
 						fontSrc: ["'self'", "https://fonts.gstatic.com"],
 						objectSrc: ["'none'"],
@@ -46,7 +46,7 @@ const app = new Elysia()
 						defaultSrc: ["'self'"],
 						styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
 						scriptSrc: ["'self'", "'unsafe-eval'"], // Necesario para Alpine.js también en producción
-						imgSrc: ["'self'", "data:"],
+						imgSrc: ["'self'", "data:", "https://avatars.githubusercontent.com"],
 						connectSrc: ["'self'"],
 						fontSrc: ["'self'", "https://fonts.gstatic.com"],
 						objectSrc: ["'none'"],
