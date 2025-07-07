@@ -1,20 +1,35 @@
-# Bun + Alpine.js Full-Stack Application
+# Programming Languages Ranking 2025
 
-A modern full-stack TypeScript application using **Bun**, **Elysia.js**, and **Alpine.js** with separated backend/frontend architecture.
+A modern full-stack TypeScript application for community-driven programming language ranking using **Bun**, **Elysia.js**, and **Alpine.js**. Features GitHub OAuth authentication, real-time voting, and reactive UI updates.
+
+## ✨ Features
+
+- **📊 Monthly Rankings** - Community-driven ranking of 55+ programming languages
+- **🔐 GitHub Authentication** - Secure OAuth login with GitHub accounts
+- **🗳️ Smart Voting System** - 10 points per month with slot-based allocation (5+3+2+1...)
+- **⚡ Real-time Updates** - Reactive UI updates without page reloads
+- **🔒 Server-side Validation** - All business logic secured in backend
+- **📱 Responsive Design** - Modern UI that works on all devices
+- **🔄 Refresh Button** - Manual ranking updates with visual feedback
+- **📈 Live Statistics** - Real-time vote counts and user participation
 
 ## 🚀 Tech Stack
 
 ### Backend
 - **[Bun](https://bun.sh)** - Fast JavaScript runtime and package manager
 - **[Elysia.js](https://elysiajs.com/)** - Ergonomic web framework for Bun
+- **SQLite** - Local database with Bun native bindings
+- **GitHub OAuth** - Authentication via GitHub accounts
+- **JWT Sessions** - Secure session management with HTTP-only cookies
 - **TypeScript** - Type safety and modern JavaScript features
-- **Security middleware** - Helmet and rate limiting for production security
+- **Security middleware** - Helmet, rate limiting, and CORS protection
 
 ### Frontend  
-- **[Alpine.js](https://alpinejs.dev/)** - Lightweight reactive framework
+- **[Alpine.js](https://alpinejs.dev/)** - Lightweight reactive framework for real-time UI updates
 - **[Alpine AJAX](https://alpine-ajax.js.org/)** - Server communication plugin
 - **[esbuild](https://esbuild.github.io/)** - Fast bundler and build tool
 - **TypeScript** - Type safety for frontend code
+- **Reactive Voting** - Real-time ranking updates without page reloads
 
 ## 📁 Project Structure
 
@@ -24,9 +39,9 @@ A modern full-stack TypeScript application using **Bun**, **Elysia.js**, and **A
 ├── tsconfig.json            # Backend TypeScript config  
 ├── index.ts                 # Backend entry point (Elysia.js server)
 ├── src/                     # Backend source code
-│   ├── routes/             # API routes (/app/ prefix)
-│   ├── services/           # Business logic
-│   ├── middleware/         # Custom middleware
+│   ├── auth/               # GitHub OAuth & JWT session management
+│   ├── database/           # SQLite queries, migrations & schema
+│   ├── services/           # Business logic (vote validation, etc.)
 │   └── utils/              # Utilities
 └── frontend/                # Frontend project (self-contained)
     ├── package.json         # Frontend dependencies
@@ -64,6 +79,18 @@ A modern full-stack TypeScript application using **Bun**, **Elysia.js**, and **A
    # or manually: cd frontend && bun install
    ```
 
+4. **Configure environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your GitHub OAuth credentials
+   ```
+   
+   Required environment variables:
+   - `GITHUB_CLIENT_ID` - GitHub OAuth App Client ID
+   - `GITHUB_CLIENT_SECRET` - GitHub OAuth App Client Secret  
+   - `BASE_URL` - Base URL for OAuth redirects (default: http://localhost:3000)
+   - `JWT_SECRET` - Secret key for JWT tokens (generate a strong random string)
+
 ## 🚦 Development
 
 ### Start Development Server
@@ -82,6 +109,7 @@ bun run start:dev      # Start development server (NODE_ENV=development)
 bun run type-check     # TypeScript checking (both projects)
 bun run lint           # Code linting with Biome
 bun run format         # Code formatting with Biome
+bun run reset-db       # Reset database (development only)
 ```
 
 ### Working with Individual Projects
@@ -104,28 +132,43 @@ bun run type-check        # Check frontend types
 
 The backend serves API endpoints under the `/app/` prefix:
 
-- `GET /app/health` - Health check endpoint
-- `GET /app/users` - Get users list
-- `POST /app/users` - Create new user
+### Public Endpoints
+- `GET /app/health` - Health check and database stats
+- `GET /app/languages` - Get all programming languages with rankings
+- `GET /app/ranking` - Get current month's top 20 ranking
+
+### Authentication
+- `GET /app/auth/login` - Initiate GitHub OAuth login
+- `GET /app/auth/callback` - GitHub OAuth callback handler
+- `POST /app/auth/logout` - Logout and clear session
+- `GET /app/auth/me` - Get current user info
+
+### Protected Endpoints (Require Authentication)
+- `POST /app/vote` - Submit vote for a programming language
+- `GET /app/user/votes` - Get current user's votes for this month
 
 Frontend static files are served from `/` (root path).
 
 ## 🏗️ Architecture Highlights
 
 ### Backend Features
+- **GitHub OAuth Integration** - Secure authentication with GitHub accounts
+- **JWT Session Management** - HTTP-only cookies with secure token handling
+- **Vote Validation System** - Server-side business logic for voting slots (5, 3, 2, 1 points)
+- **SQLite Database** - Native Bun SQLite with migrations and seeding
 - **Direct TypeScript execution** - No build step needed
-- **CORS enabled** - Ready for frontend communication
 - **API documentation** - Auto-generated Swagger docs
-- **Static file serving** - Serves frontend assets
-- **Security headers** - Content Security Policy, XSS protection
+- **Security headers** - Content Security Policy, XSS protection, CORS
 - **Rate limiting** - 100 requests per 15 minutes protection
 
 ### Frontend Features  
+- **Reactive UI Updates** - Real-time ranking changes without page reloads
+- **Interactive Voting** - Immediate feedback with vote validation
+- **Alpine.js Reactivity** - Efficient DOM updates and state management
+- **GitHub OAuth UI** - Seamless login/logout experience
 - **No CDN dependencies** - All libraries bundled
 - **Official TypeScript types** - Full type safety
-- **IIFE format** - Compatible with Alpine.js
 - **ES2022 target** - Modern JavaScript features
-- **CSS bundling** - Optimized stylesheets
 
 ### Development Experience
 - **Hot reload** - Both backend and frontend

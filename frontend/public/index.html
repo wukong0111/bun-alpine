@@ -15,25 +15,55 @@
         <!-- Header -->
         <header class="header">
             <div class="container">
-                <h1 class="title">
-                    <span class="emoji">🏆</span>
-                    Programming Languages Ranking
-                    <span class="year">2025</span>
-                </h1>
-                <p class="subtitle">Community-driven monthly ranking • Vote with 10 points per month</p>
+                <div class="header-content">
+                    <div class="title-section">
+                        <h1 class="title">
+                            <span class="emoji">🏆</span>
+                            Programming Languages Ranking
+                            <span class="year">2025</span>
+                        </h1>
+                        <p class="subtitle">Community-driven monthly ranking • Vote with 10 points per month</p>
+                    </div>
+                    
+                    <!-- Auth Section -->
+                    <div class="auth-section">
+                        <div x-show="!isAuthenticated && !loading" class="auth-prompt">
+                            <p class="auth-text">Sign in with GitHub to vote</p>
+                            <button x-on:click="login()" class="auth-btn login-btn">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                                </svg>
+                                Sign in with GitHub
+                            </button>
+                        </div>
+                        
+                        <div x-show="isAuthenticated && !loading" class="user-info">
+                            <div class="user-avatar">
+                                <img x-show="user?.avatarUrl" :src="user?.avatarUrl" :alt="user?.username" class="avatar-img">
+                                <div x-show="!user?.avatarUrl" class="avatar-placeholder">
+                                    <span x-text="user?.username?.charAt(0).toUpperCase()"></span>
+                                </div>
+                            </div>
+                            <div class="user-details">
+                                <span class="username" x-text="user?.username"></span>
+                                <button x-on:click="logout()" class="auth-btn logout-btn">Sign out</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 
                 <!-- Stats Bar -->
-                <div class="stats-bar" x-show="stats">
+                <div class="stats-bar" x-show="stats && !loading">
                     <div class="stat">
-                        <span class="stat-value" x-text="stats.total_votes || 0"></span>
+                        <span class="stat-value" x-text="(stats && stats.total_votes) || 0"></span>
                         <span class="stat-label">Total Votes</span>
                     </div>
                     <div class="stat">
-                        <span class="stat-value" x-text="stats.total_users || 0"></span>
+                        <span class="stat-value" x-text="(stats && stats.total_users) || 0"></span>
                         <span class="stat-label">Voters</span>
                     </div>
                     <div class="stat">
-                        <span class="stat-value" x-text="currentMonth"></span>
+                        <span class="stat-value" x-text="currentMonth || 'Loading...'"></span>
                         <span class="stat-label">Current Month</span>
                     </div>
                 </div>
@@ -50,14 +80,28 @@
 
                 <!-- Top 20 Ranking -->
                 <section class="ranking-section" x-show="!loading">
-                    <h2 class="section-title">
-                        <span class="emoji">🥇</span>
-                        Top 20 Programming Languages
-                    </h2>
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <span class="emoji">🥇</span>
+                            Top 20 Programming Languages
+                        </h2>
+                        <button 
+                            class="refresh-btn"
+                            x-on:click="refreshRanking()"
+                            :disabled="refreshingRanking"
+                            :class="{ 'refreshing': refreshingRanking }">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="m3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                            <span x-text="refreshingRanking ? 'Updating...' : 'Refresh Ranking'"></span>
+                        </button>
+                    </div>
                     
                     <div class="ranking-grid">
                         <template x-for="(language, index) in featuredLanguages" :key="language.id">
-                            <div class="language-card" :class="'rank-' + (index + 1)">
+                            <div class="language-card top-20-card" :class="'rank-' + (index + 1)">
                                 <div class="rank-badge" x-text="index + 1"></div>
                                 <div class="language-info">
                                     <div class="language-header">
@@ -75,11 +119,11 @@
                                 </div>
                                 <div class="vote-section">
                                     <div class="vote-input">
-                                        <label x-text="'Points (max ' + getMaxPointsForRank(index + 1) + '):'"></label>
+                                        <label x-text="'Points (max ' + getMaxPointsForLanguage(language.id) + '):'"></label>
                                         <input 
                                             type="number" 
                                             x-model="votePoints[language.id]"
-                                            :max="getMaxPointsForRank(index + 1)"
+                                            :max="getMaxPointsForLanguage(language.id)"
                                             min="0"
                                             class="points-input">
                                     </div>
@@ -96,7 +140,7 @@
                 </section>
 
                 <!-- User Voting Status -->
-                <section class="voting-status" x-show="!loading">
+                <section class="voting-status" x-show="!loading && isAuthenticated">
                     <div class="points-summary">
                         <h3>Your Voting Status</h3>
                         <div class="points-info">
@@ -113,6 +157,21 @@
                     </div>
                 </section>
 
+                <!-- Authentication Required Notice -->
+                <section class="auth-notice" x-show="!loading && !isAuthenticated">
+                    <div class="notice-content">
+                        <h3>🔐 Authentication Required</h3>
+                        <p>Sign in with your GitHub account to participate in the voting and help rank your favorite programming languages!</p>
+                        <button x-on:click="login()" class="auth-btn login-btn large">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                            </svg>
+                            Sign in with GitHub to Vote
+                        </button>
+                        <p class="notice-subtitle">Your votes help determine the most popular programming languages this month!</p>
+                    </div>
+                </section>
+
                 <!-- Additional Languages -->
                 <section class="additional-section" x-show="!loading && additionalLanguages.length > 0">
                     <h2 class="section-title">
@@ -120,7 +179,7 @@
                         More Languages to Vote
                     </h2>
                     <p class="section-description">
-                        Select other programming languages to include in your voting
+                        Vote for any programming language with your remaining points
                     </p>
                     
                     <div class="additional-grid">
@@ -135,12 +194,28 @@
                                         <h4 class="language-name" x-text="language.name"></h4>
                                     </div>
                                     <p class="language-description" x-text="language.description"></p>
+                                    <div class="language-stats">
+                                        <span class="total-votes" x-text="language.total_votes + ' total votes'"></span>
+                                        <span class="month-votes" x-text="'(' + (language.current_month_points || 0) + ' this month)'"></span>
+                                    </div>
                                 </div>
-                                <button 
-                                    class="select-btn"
-                                    x-on:click="selectAdditionalLanguage(language)"
-                                    x-text="'Add to Ranking'">
-                                </button>
+                                <div class="vote-section">
+                                    <div class="vote-input">
+                                        <label x-text="'Points (max ' + getMaxPointsForLanguage(language.id) + '):'"></label>
+                                        <input 
+                                            type="number" 
+                                            x-model="votePoints[language.id]"
+                                            :max="getMaxPointsForLanguage(language.id)"
+                                            min="0"
+                                            class="points-input">
+                                    </div>
+                                    <button 
+                                        class="vote-btn"
+                                        x-on:click="voteForLanguage(language.id, votePoints[language.id])"
+                                        :disabled="!canVote(language.id, votePoints[language.id])"
+                                        x-text="getVoteButtonText(language.id, votePoints[language.id])">
+                                    </button>
+                                </div>
                             </div>
                         </template>
                     </div>
@@ -153,7 +228,7 @@
                             <h4>How Voting Works</h4>
                             <ul>
                                 <li>You get 10 points per month to distribute</li>
-                                <li>Maximum 5 points to #1, 3 points to #2, 2 points to #3, etc.</li>
+                                <li>Maximum 5 points to your 1st vote, 3 to your 2nd, 2 to your 3rd, 1 to rest</li>
                                 <li>Vote once per month for each language</li>
                                 <li>GitHub authentication required</li>
                             </ul>

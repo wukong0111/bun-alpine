@@ -99,6 +99,9 @@ This project uses a **separated backend/frontend architecture** with independent
 - `elysia-rate-limit` - Rate limiting protection
 
 ### Key Principles
+- **Business Logic Only in Backend** - All validation, authentication, authorization, and business rules must be implemented on the server
+- **Frontend is UI/UX Only** - The client should only handle user interactions, display logic, and API calls
+- **Security by Design** - Never trust the frontend; validate everything server-side
 - API routes use `/app/` prefix (not `/api/`)
 - Serves frontend static files from `frontend/dist/`
 - No bundling needed - Bun runs TypeScript directly
@@ -128,10 +131,121 @@ This project uses a **separated backend/frontend architecture** with independent
 - **Source maps** - For development debugging
 
 ### Key Principles
+- **UI/UX Only** - No business logic, validation, or security checks in frontend code
+- **API Communication** - Only makes AJAX calls to backend endpoints and handles responses
+- **Client-Side Validation** - For user experience only (not security); all validation must be duplicated server-side
+- **State Management** - Local state for UI reactivity only; server state is source of truth
 - Self-contained with own package.json
 - esbuild config located in frontend/
 - Uses official Alpine.js TypeScript types
 - No CDN dependencies - everything bundled
+
+## Code Architecture & Separation of Concerns
+
+### Backend Structure
+
+#### Controllers/Routes (`index.ts`, `/src/routes/`)
+- **Responsibility**: HTTP request/response handling, routing, middleware
+- **What to include**: Route definitions, request parsing, response formatting
+- **What NOT to include**: Business logic, complex validation, data processing
+
+```typescript
+// ✅ Good - Route handler delegates to service
+.post("/vote", ({ body, user }) => {
+  const validation = VoteService.validateVote(user.id, body.languageId, body.points, month);
+  if (!validation.isValid) {
+    throw new Error(validation.error);
+  }
+  const result = VoteService.processVote(user.id, body.languageId, body.points, month);
+  return result;
+})
+
+// ❌ Bad - Business logic in route handler
+.post("/vote", ({ body, user }) => {
+  if (body.points < 1 || body.points > 5) throw new Error("Invalid points");
+  const votes = getUserVotes(user.id);
+  const slot5Used = votes.some(v => v.points === 5);
+  // ... complex logic here
+})
+```
+
+#### Services (`/src/services/`)
+- **Responsibility**: Business logic, complex validation, data orchestration
+- **What to include**: Validation rules, business workflows, data transformation
+- **What NOT to include**: HTTP-specific code, direct database queries
+
+```typescript
+// ✅ Good - Service handles business logic
+export class VoteService {
+  static validateVoteSlots(userId: number, languageId: number, points: number): ValidationResult {
+    const userVotes = voteQueries.getUserMonthlyVotes(userId, month);
+    const slot5Used = userVotes.some(v => v.points === 5 && v.language_id !== languageId);
+    
+    if (points === 5 && slot5Used) {
+      return { isValid: false, error: "5-point slot already used" };
+    }
+    return { isValid: true };
+  }
+}
+```
+
+#### Database Layer (`/src/database/`)
+- **Responsibility**: Data access, database operations, schema management
+- **What to include**: SQL queries, database utilities, migrations
+- **What NOT to include**: Business validation, HTTP responses
+
+### Frontend Structure
+
+#### Alpine.js Components (`/frontend/src/js/`)
+- **Responsibility**: UI interactions, display logic, user experience
+- **What to include**: DOM manipulation, client-side state, API calls, user feedback
+- **What NOT to include**: Business validation, security checks, complex business rules
+
+```typescript
+// ✅ Good - Frontend handles UI, backend handles validation
+async voteForLanguage(languageId: number, points: number) {
+  try {
+    const response = await fetch('/app/vote', {
+      method: 'POST',
+      body: JSON.stringify({ languageId, points })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      alert(error.message); // Show backend error to user
+      return;
+    }
+    
+    // Update UI with success
+    await this.loadUserVotes();
+  } catch (error) {
+    alert('Network error');
+  }
+}
+
+// ❌ Bad - Business logic in frontend
+canVote(languageId: number, points: number): boolean {
+  const slot5Used = Object.values(this.votes).includes(5);
+  if (points === 5 && slot5Used) return false; // Business logic belongs in backend
+  return true;
+}
+```
+
+### Security Guidelines
+
+1. **Authentication & Authorization**: Always validate tokens and permissions server-side
+2. **Input Validation**: Backend must validate all inputs, regardless of frontend validation
+3. **Business Rules**: All business logic enforcement happens in backend services
+4. **Data Integrity**: Database constraints and server-side checks prevent invalid data
+5. **API Security**: Rate limiting, CORS, and security headers configured server-side
+
+### Anti-Patterns to Avoid
+
+❌ **Frontend-Only Validation**: Relying on client-side checks for security
+❌ **Business Logic in Routes**: Complex logic directly in HTTP handlers  
+❌ **Mixed Responsibilities**: Services that handle both HTTP and business logic
+❌ **Client-Side Security**: Authentication or authorization logic in frontend
+❌ **Trusting Client Data**: Accepting frontend validation as sufficient
 
 ## Development Workflow
 
@@ -167,5 +281,32 @@ bun run build
 bun run dev
 bun run type-check
 ```
+
+### Development Tools & Scripts
+
+#### Database Management
+```bash
+bun run reset-db           # Reset database (development only)
+```
+
+#### Security Testing
+```bash
+# Test API endpoints with curl
+curl -X POST http://localhost:3000/app/vote \
+  -H "Content-Type: application/json" \
+  -H "Cookie: auth_token=..." \
+  -d '{"languageId": 1, "points": 5}'
+
+# Test without authentication (should fail)
+curl -X POST http://localhost:3000/app/vote \
+  -H "Content-Type: application/json" \
+  -d '{"languageId": 1, "points": 5}'
+```
+
+#### Architecture Validation
+- All business logic must be testable independently of HTTP layer
+- Frontend validation should be duplicated in backend services
+- Database queries should be abstracted in dedicated query modules
+- Services should not directly depend on HTTP request/response objects
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.

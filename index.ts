@@ -2,16 +2,29 @@ import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { staticPlugin } from "@elysiajs/static";
 import { swagger } from "@elysiajs/swagger";
+import { jwt } from "@elysiajs/jwt";
+import { cookie } from "@elysiajs/cookie";
 import { elysiaHelmet } from "elysiajs-helmet";
 import { rateLimit } from "elysia-rate-limit";
 import { initDatabase } from "./src/database/init";
 import { getDbStats } from "./src/database/schema";
 import { languageQueries, userQueries, voteQueries, dbUtils } from "./src/database/queries";
+import { db } from "./src/database/database";
+import { GitHubAuth } from "./src/auth/github";
+import { jwtConfig, cookieConfig, createSessionToken, verifySessionToken, requireAuth } from "./src/auth/session";
+import { VoteService } from "./src/services/voteService";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 
 // Inicializar base de datos al arrancar
 initDatabase();
+
+// Configurar GitHub OAuth
+const githubAuth = new GitHubAuth({
+  clientId: process.env.GITHUB_CLIENT_ID || 'your-github-client-id',
+  clientSecret: process.env.GITHUB_CLIENT_SECRET || 'your-github-client-secret',
+  redirectUri: `${process.env.BASE_URL || 'http://localhost:3000'}/app/auth/callback`,
+});
 
 const app = new Elysia()
 	.use(
@@ -19,21 +32,21 @@ const app = new Elysia()
 			csp: isDevelopment
 				? {
 						defaultSrc: ["'self'"],
-						styleSrc: ["'self'", "'unsafe-inline'"],
+						styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
 						scriptSrc: ["'self'", "'unsafe-eval'"], // Necesario para Alpine.js en desarrollo
 						imgSrc: ["'self'", "data:", "https:"],
 						connectSrc: ["'self'"],
-						fontSrc: ["'self'"],
+						fontSrc: ["'self'", "https://fonts.gstatic.com"],
 						objectSrc: ["'none'"],
 						frameSrc: ["'none'"],
 					}
 				: {
 						defaultSrc: ["'self'"],
-						styleSrc: ["'self'", "'unsafe-inline'"],
+						styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
 						scriptSrc: ["'self'", "'unsafe-eval'"], // Necesario para Alpine.js también en producción
 						imgSrc: ["'self'", "data:"],
 						connectSrc: ["'self'"],
-						fontSrc: ["'self'"],
+						fontSrc: ["'self'", "https://fonts.gstatic.com"],
 						objectSrc: ["'none'"],
 						frameSrc: ["'none'"],
 					},
@@ -47,7 +60,28 @@ const app = new Elysia()
 		}),
 	)
 	.use(cors())
+	.use(jwt(jwtConfig))
+	.use(cookie({
+		httpOnly: true,
+		secure: process.env.NODE_ENV === 'production',
+		sameSite: 'lax',
+		maxAge: 7 * 24 * 60 * 60, // 7 días
+		path: '/',
+	}))
 	.use(swagger())
+	// Middleware de autenticación
+	.derive(async ({ headers, cookie, jwt }) => {
+		const token = cookie?.auth_token?.value;
+		let user = null;
+
+		// Debug logs removidos para limpiar consola
+
+		if (token && typeof token === 'string') {
+			user = await verifySessionToken(token, jwt);
+		}
+
+		return { user };
+	})
 	.use(
 		staticPlugin({
 			assets: "frontend/dist",
@@ -65,15 +99,22 @@ const app = new Elysia()
 				stats: voteQueries.getCurrentMonthStats(),
 			}))
 			
-			// Endpoints de prueba para lenguajes
-			.get("/languages", () => ({
-				featured: languageQueries.getFeaturedLanguages(),
-				additional: languageQueries.getAdditionalLanguages(),
-			}))
+			// Endpoints para ranking dinámico
+			.get("/languages", () => {
+				const completeRanking = dbUtils.getCompleteRanking();
+				return {
+					top20: completeRanking.slice(0, 20),
+					additional: completeRanking.slice(20),
+					total: completeRanking.length
+				};
+			})
 			
-			.get("/languages/featured", () => languageQueries.getFeaturedLanguages())
+			.get("/languages/all", () => languageQueries.getAllLanguagesRanked())
 			
-			.get("/languages/additional", () => languageQueries.getAdditionalLanguages())
+			.get("/languages/top/:limit", ({ params }: { params: any }) => {
+				const limit = parseInt(params.limit) || 20;
+				return languageQueries.getTopLanguages(limit);
+			})
 			
 			.get("/languages/:id", ({ params }: { params: any }) => {
 				const language = languageQueries.getLanguageById(parseInt(params.id));
@@ -86,7 +127,7 @@ const app = new Elysia()
 			// Endpoint para obtener ranking actual
 			.get("/ranking", () => ({
 				month: dbUtils.getCurrentMonth(),
-				ranking: dbUtils.getCurrentRanking(),
+				ranking: dbUtils.getTopRankingWithStats(20),
 				stats: voteQueries.getCurrentMonthStats(),
 			}))
 			
@@ -109,8 +150,174 @@ const app = new Elysia()
 				return user;
 			})
 			
-			// Endpoint para simular votación (mock)
+			// Endpoints de autenticación
+			.get("/auth/login", ({ query }) => {
+				const state = crypto.randomUUID();
+				const authUrl = githubAuth.getAuthUrl(state);
+				
+				// En un sistema real, guardaríamos el state en una sesión temporal
+				// Por simplicidad, lo omitimos por ahora
+				
+				return Response.redirect(authUrl, 302);
+			})
+			
+			.get("/auth/callback", async ({ query, cookie, jwt }) => {
+				try {
+					const { code } = query as { code?: string };
+					
+					if (!code) {
+						throw new Error("No authorization code received");
+					}
+					
+					// Autenticar usuario con GitHub
+					const githubUser = await githubAuth.authenticateUser(code);
+					
+					// Crear o actualizar usuario en nuestra base de datos
+					const user = userQueries.upsertUser(
+						githubUser.id,
+						githubUser.login,
+						githubUser.avatar_url
+					);
+					
+					// Crear token JWT
+					const token = await createSessionToken(user, jwt);
+					
+					// Establecer cookie de autenticación
+					cookie.auth_token.value = token;
+					cookie.auth_token.httpOnly = true;
+					cookie.auth_token.secure = process.env.NODE_ENV === 'production';
+					cookie.auth_token.sameSite = 'lax';
+					cookie.auth_token.maxAge = 7 * 24 * 60 * 60; // 7 días
+					cookie.auth_token.path = '/';
+					
+					// Redirigir a la página principal
+					return Response.redirect("/", 302);
+					
+				} catch (error) {
+					console.error("Auth callback error:", error);
+					return Response.redirect("/?error=auth_failed", 302);
+				}
+			})
+			
+			.post("/auth/logout", ({ cookie }) => {
+				// Limpiar cookie de autenticación configurándola para que expire
+				cookie.auth_token.value = '';
+				cookie.auth_token.httpOnly = true;
+				cookie.auth_token.secure = process.env.NODE_ENV === 'production';
+				cookie.auth_token.sameSite = 'lax';
+				cookie.auth_token.maxAge = 0; // Expira inmediatamente
+				cookie.auth_token.path = '/';
+				
+				return { success: true, message: "Logged out successfully" };
+			})
+			
+			.get("/auth/me", ({ user }) => {
+				if (!user) {
+					return { authenticated: false };
+				}
+				
+				return {
+					authenticated: true,
+					user: {
+						id: user.userId,
+						githubId: user.githubId,
+						username: user.username,
+						avatarUrl: user.avatarUrl,
+					}
+				};
+			})
+			
+			.get("/user/votes", ({ user }) => {
+				try {
+					if (!user) {
+						throw new Error("Authentication required");
+					}
+					
+					const authenticatedUser = user;
+					const month = dbUtils.getCurrentMonth();
+					
+					// Obtener votos del usuario para el mes actual
+					const votes = voteQueries.getUserMonthlyVotes(authenticatedUser.userId, month);
+					const monthlyPoints = voteQueries.getUserMonthlyPoints(authenticatedUser.userId, month);
+					
+					// Convertir a formato que espera el frontend
+					const votePoints: Record<number, number> = {};
+					votes.forEach(vote => {
+						votePoints[vote.language_id] = vote.points;
+					});
+					
+					return {
+						votePoints,
+						totalPoints: monthlyPoints.total_points,
+						remainingPoints: 10 - monthlyPoints.total_points,
+						votesCount: monthlyPoints.votes_count,
+						month
+					};
+				} catch (error) {
+					throw error;
+				}
+			})
+			
+			// Endpoint para votar (requiere autenticación)
+			.post("/vote", ({ body, user }: { body: any; user: any }) => {
+				if (!user) {
+					throw new Error("Authentication required");
+				}
+				const authenticatedUser = user;
+				const { languageId, points } = body;
+				const month = dbUtils.getCurrentMonth();
+				
+				if (!languageId || !points) {
+					throw new Error("languageId and points are required");
+				}
+				
+				// Validar voto usando el servicio dedicado
+				const validation = VoteService.validateVote(authenticatedUser.userId, languageId, points, month);
+				if (!validation.isValid) {
+					throw new Error(validation.error);
+				}
+				
+				try {
+					// Verificar si es un voto existente
+					const existingVote = db.query(`
+						SELECT points FROM votes 
+						WHERE user_id = ? AND language_id = ? AND vote_month = ?
+					`).get(authenticatedUser.userId, languageId, month) as { points: number } | null;
+					
+					// Insertar o actualizar voto en la base de datos
+					const vote = voteQueries.upsertVote(authenticatedUser.userId, languageId, points, month);
+					
+					// Actualizar total de votos del lenguaje
+					languageQueries.updateLanguageVotes(languageId);
+					
+					// Calcular puntos restantes
+					const newMonthlyPoints = voteQueries.getUserMonthlyPoints(authenticatedUser.userId, month);
+					const remainingPoints = 10 - newMonthlyPoints.total_points;
+					
+					return {
+						success: true,
+						message: existingVote ? "Vote updated successfully" : "Vote recorded successfully",
+						vote: {
+							id: vote.id,
+							userId: vote.user_id,
+							languageId: vote.language_id,
+							points: vote.points,
+							month: vote.vote_month
+						},
+						remaining_points: remainingPoints
+					};
+				} catch (error) {
+					console.error("Error recording vote:", error);
+					throw new Error("Failed to record vote. Please try again.");
+				}
+			})
+			
+			// Endpoint para simular votación (mock - solo para desarrollo)
 			.post("/test/vote", ({ body }: { body: any }) => {
+				if (!isDevelopment) {
+					throw new Error("Test endpoints only available in development");
+				}
+				
 				const { userId, languageId, points } = body;
 				const month = dbUtils.getCurrentMonth();
 				

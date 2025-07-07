@@ -27,23 +27,30 @@ export interface Vote {
 
 // Consultas para lenguajes
 export const languageQueries = {
-  // Obtener top 20 lenguajes (featured)
-  getFeaturedLanguages(): Language[] {
+  // Obtener todos los lenguajes ordenados por ranking dinámico
+  getAllLanguagesRanked(): Language[] {
     return db.query(`
       SELECT * FROM languages 
-      WHERE is_featured = true 
       ORDER BY total_votes DESC, name ASC
-      LIMIT 20
     `).all() as Language[];
   },
 
-  // Obtener lenguajes adicionales (no featured)
-  getAdditionalLanguages(): Language[] {
+  // Obtener top N lenguajes (dinámico)
+  getTopLanguages(limit: number = 20): Language[] {
     return db.query(`
       SELECT * FROM languages 
-      WHERE is_featured = false 
-      ORDER BY name ASC
-    `).all() as Language[];
+      ORDER BY total_votes DESC, name ASC
+      LIMIT ?
+    `).all(limit) as Language[];
+  },
+
+  // Obtener lenguajes desde una posición específica
+  getLanguagesFromPosition(offset: number, limit: number = 35): Language[] {
+    return db.query(`
+      SELECT * FROM languages 
+      ORDER BY total_votes DESC, name ASC
+      LIMIT ? OFFSET ?
+    `).all(limit, offset) as Language[];
   },
 
   // Obtener un lenguaje por ID
@@ -159,6 +166,44 @@ export const voteQueries = {
     `).get(currentMonth) as { total_votes: number; total_users: number; total_points: number };
     
     return result;
+  },
+
+  // Insertar un nuevo voto
+  insertVote(userId: number, languageId: number, points: number, month: string): Vote {
+    const result = db.query(`
+      INSERT INTO votes (user_id, language_id, points, vote_month)
+      VALUES (?, ?, ?, ?)
+      RETURNING *
+    `).get(userId, languageId, points, month) as Vote;
+
+    return result;
+  },
+
+  // Actualizar un voto existente
+  updateVote(userId: number, languageId: number, points: number, month: string): Vote {
+    const result = db.query(`
+      UPDATE votes 
+      SET points = ?
+      WHERE user_id = ? AND language_id = ? AND vote_month = ?
+      RETURNING *
+    `).get(points, userId, languageId, month) as Vote;
+
+    return result;
+  },
+
+  // Insertar o actualizar voto (upsert)
+  upsertVote(userId: number, languageId: number, points: number, month: string): Vote {
+    // Verificar si ya existe un voto
+    const existing = db.query(`
+      SELECT id FROM votes 
+      WHERE user_id = ? AND language_id = ? AND vote_month = ?
+    `).get(userId, languageId, month);
+
+    if (existing) {
+      return this.updateVote(userId, languageId, points, month);
+    } else {
+      return this.insertVote(userId, languageId, points, month);
+    }
   }
 };
 
@@ -169,13 +214,14 @@ export const dbUtils = {
     return new Date().toISOString().slice(0, 7);
   },
 
-  // Obtener ranking actual con estadísticas
-  getCurrentRanking() {
+  // Obtener ranking completo con estadísticas del mes actual
+  getCompleteRanking() {
     return db.query(`
       SELECT 
         l.*,
         COALESCE(current_month_votes.points, 0) as current_month_points,
-        COALESCE(current_month_votes.voters, 0) as current_month_voters
+        COALESCE(current_month_votes.voters, 0) as current_month_voters,
+        ROW_NUMBER() OVER (ORDER BY l.total_votes DESC, l.name ASC) as rank_position
       FROM languages l
       LEFT JOIN (
         SELECT 
@@ -186,9 +232,30 @@ export const dbUtils = {
         WHERE vote_month = ?
         GROUP BY language_id
       ) current_month_votes ON l.id = current_month_votes.language_id
-      WHERE l.is_featured = true
       ORDER BY l.total_votes DESC, l.name ASC
-      LIMIT 20
     `).all(dbUtils.getCurrentMonth());
+  },
+
+  // Obtener ranking del top N con estadísticas
+  getTopRankingWithStats(limit: number = 20) {
+    return db.query(`
+      SELECT 
+        l.*,
+        COALESCE(current_month_votes.points, 0) as current_month_points,
+        COALESCE(current_month_votes.voters, 0) as current_month_voters,
+        ROW_NUMBER() OVER (ORDER BY l.total_votes DESC, l.name ASC) as rank_position
+      FROM languages l
+      LEFT JOIN (
+        SELECT 
+          language_id,
+          SUM(points) as points,
+          COUNT(DISTINCT user_id) as voters
+        FROM votes 
+        WHERE vote_month = ?
+        GROUP BY language_id
+      ) current_month_votes ON l.id = current_month_votes.language_id
+      ORDER BY l.total_votes DESC, l.name ASC
+      LIMIT ?
+    `).all(dbUtils.getCurrentMonth(), limit);
   }
 };
