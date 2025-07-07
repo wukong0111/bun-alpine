@@ -88,14 +88,14 @@ async function generateSQLDump(): Promise<string> {
       
       if (rows.length > 0) {
         // Obtener nombres de columnas
-        const columns = Object.keys(rows[0]);
+        const columns = Object.keys(rows[0] as Record<string, any>);
         const columnNames = columns.join(', ');
         
         sqlDump += `-- Data for table: ${tableName}\n`;
         
         for (const row of rows) {
           const values = columns.map(col => {
-            const value = (row as any)[col];
+            const value = (row as Record<string, any>)[col];
             if (value === null) return 'NULL';
             if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
             return value;
@@ -139,7 +139,7 @@ async function getBackupMetadata(): Promise<BackupMetadata> {
   };
   
   // Obtener tamaño de la base de datos
-  const dbSize = await Bun.file(process.env.DATABASE_PATH || './src/database/ranking.db').size();
+  const dbSize = (await Bun.file(process.env.DATABASE_PATH || './src/database/ranking.db').size) || 0;
   
   // Contar tablas
   const tableCount = db.prepare(`

@@ -1,4 +1,4 @@
-import { Context } from 'elysia';
+import type { Context } from 'elysia';
 
 export function adminAuth() {
   return async (context: Context) => {

@@ -1,6 +1,6 @@
 import { jwt } from '@elysiajs/jwt';
 import { cookie } from '@elysiajs/cookie';
-import { User } from '../database/queries';
+import type { User } from '../database/queries';
 
 export interface SessionData {
   userId: number;
