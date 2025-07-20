@@ -1,20 +1,20 @@
 {
-  "name": "bun-alpine-frontend",
-  "version": "1.0.0",
-  "type": "module",
-  "private": true,
-  "scripts": {
-    "build": "NODE_ENV=production bun esbuild.config.ts",
-    "dev": "NODE_ENV=development bun esbuild.config.ts",
-    "type-check": "tsc --noEmit"
-  },
-  "dependencies": {
-    "alpinejs": "^3.14.9",
-    "@imacrayon/alpine-ajax": "^0.12.4"
-  },
-  "devDependencies": {
-    "@types/alpinejs": "^3.13.11",
-    "esbuild": "^0.25.5",
-    "typescript": "^5.8.3"
-  }
+	"name": "bun-alpine-frontend",
+	"version": "1.0.0",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"build": "NODE_ENV=production bun esbuild.config.ts",
+		"dev": "NODE_ENV=development bun esbuild.config.ts",
+		"type-check": "tsc --noEmit"
+	},
+	"dependencies": {
+		"alpinejs": "^3.14.9",
+		"@imacrayon/alpine-ajax": "^0.12.4"
+	},
+	"devDependencies": {
+		"@types/alpinejs": "^3.13.11",
+		"esbuild": "^0.25.5",
+		"typescript": "^5.8.3"
+	}
 }

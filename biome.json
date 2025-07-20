@@ -1,4 +1,8 @@
 {
+	"files": {
+		"includes": ["src/**", "index.ts"],
+		"ignoreUnknown": true
+	},
 	"linter": {
 		"enabled": true,
 		"rules": {
@@ -19,13 +23,5 @@
 			"trailingCommas": "all",
 			"quoteStyle": "double"
 		}
-	},
-	"typescript": {
-		"formatter": {
-			"semicolons": "always",
-			"trailingCommas": "all",
-			"quoteStyle": "double"
-		}
 	}
 }
-

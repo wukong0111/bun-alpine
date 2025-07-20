@@ -35,9 +35,8 @@ Default to using Bun instead of Node.js.
 - API routes should use `/app/` prefix for frontend consumption
 
 ### Database & Storage
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
+- `postgres` for PostgreSQL. Use the postgres package for server connections.
 - `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
 
 ### File System & Process
 - Prefer `Bun.file` over `node:fs`'s readFile/writeFile
@@ -286,7 +285,11 @@ bun run start          # Start production server
 ```bash
 # .env file
 NODE_ENV=development
-DATABASE_PATH=./src/database/ranking.db
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=ranking_dev
+DATABASE_USER=dev_user
+DATABASE_PASSWORD=dev_password
 GITHUB_CLIENT_ID=your_dev_client_id
 GITHUB_CLIENT_SECRET=your_dev_client_secret
 BASE_URL=http://localhost:3000
@@ -297,7 +300,11 @@ JWT_SECRET=your_jwt_secret
 ```bash
 # Environment variables in Railway dashboard
 NODE_ENV=production
-DATABASE_PATH=./data/ranking.db
+DATABASE_HOST=your_postgres_host
+DATABASE_PORT=5432
+DATABASE_NAME=your_database_name
+DATABASE_USER=your_database_user
+DATABASE_PASSWORD=your_database_password
 GITHUB_CLIENT_ID=your_prod_client_id
 GITHUB_CLIENT_SECRET=your_prod_client_secret
 BASE_URL=https://your-domain.com
@@ -305,9 +312,9 @@ JWT_SECRET=your_strong_jwt_secret
 ```
 
 ### Database Configuration
-- **Development**: SQLite database stored in `src/database/ranking.db`
-- **Production**: SQLite database stored in `data/ranking.db`
-- **Path Priority**: Uses `DATABASE_PATH` environment variable, fallback to NODE_ENV-based paths
+- **Development**: PostgreSQL database running in Docker container
+- **Production**: PostgreSQL database hosted on cloud provider (Railway, etc.)
+- **Connection**: Uses standard PostgreSQL connection parameters (host, port, database, user, password)
 - **Security**: Reset script blocked in production environment
 
 ### GitHub OAuth Setup

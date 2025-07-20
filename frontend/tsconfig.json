@@ -1,31 +1,31 @@
 {
-  "compilerOptions": {
-    // Browser environment
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "allowJs": true,
+	"compilerOptions": {
+		// Browser environment
+		"lib": ["ES2022", "DOM", "DOM.Iterable"],
+		"target": "ES2022",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"allowJs": true,
 
-    // Build handled by esbuild
-    "noEmit": true,
-    "allowImportingTsExtensions": true,
+		// Build handled by esbuild
+		"noEmit": true,
+		"allowImportingTsExtensions": true,
 
-    // Strict type checking for frontend
-    "strict": true,
-    "skipLibCheck": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
+		// Strict type checking for frontend
+		"strict": true,
+		"skipLibCheck": true,
+		"noFallthroughCasesInSwitch": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
 
-    // Frontend-specific flags
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "exactOptionalPropertyTypes": true,
+		// Frontend-specific flags
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"exactOptionalPropertyTypes": true,
 
-    // Alpine.js types
-    "types": ["@types/alpinejs"]
-  },
-  "include": ["src/**/*"],
-  "exclude": ["../src/**/*", "../index.ts", "../*.ts"]
+		// Alpine.js types
+		"types": ["@types/alpinejs"]
+	},
+	"include": ["src/**/*"],
+	"exclude": ["../src/**/*", "../index.ts", "../*.ts"]
 }

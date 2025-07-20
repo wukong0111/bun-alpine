@@ -1,4 +1,4 @@
-declare module '@imacrayon/alpine-ajax' {
-  const ajax: any;
-  export default ajax;
+declare module "@imacrayon/alpine-ajax" {
+	const ajax: unknown;
+	export default ajax;
 }

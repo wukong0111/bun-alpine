@@ -18,7 +18,7 @@ A modern full-stack TypeScript application for community-driven programming lang
 ### Backend
 - **[Bun](https://bun.sh)** - Fast JavaScript runtime and package manager
 - **[Elysia.js](https://elysiajs.com/)** - Ergonomic web framework for Bun
-- **SQLite** - Local database with Bun native bindings
+- **PostgreSQL** - Server database with postgres client
 - **GitHub OAuth** - Authentication via GitHub accounts
 - **JWT Sessions** - Secure session management with HTTP-only cookies
 - **TypeScript** - Type safety and modern JavaScript features
@@ -40,7 +40,7 @@ A modern full-stack TypeScript application for community-driven programming lang
 ├── index.ts                 # Backend entry point (Elysia.js server)
 ├── src/                     # Backend source code
 │   ├── auth/               # GitHub OAuth & JWT session management
-│   ├── database/           # SQLite queries, migrations & schema
+│   ├── database/           # PostgreSQL queries, migrations & schema
 │   ├── services/           # Business logic (vote validation, etc.)
 │   └── utils/              # Utilities
 └── frontend/                # Frontend project (self-contained)
@@ -155,7 +155,7 @@ Frontend static files are served from `/` (root path).
 - **GitHub OAuth Integration** - Secure authentication with GitHub accounts
 - **JWT Session Management** - HTTP-only cookies with secure token handling
 - **Vote Validation System** - Server-side business logic for cumulative voting limits
-- **SQLite Database** - Native Bun SQLite with migrations and seeding
+- **PostgreSQL Database** - Server database with migrations and seeding
 - **Direct TypeScript execution** - No build step needed
 - **API documentation** - Auto-generated Swagger docs
 - **Security headers** - Content Security Policy, XSS protection, CORS
